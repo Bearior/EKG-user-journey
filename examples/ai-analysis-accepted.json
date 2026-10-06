@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "request_id": "REQ-DEMO-001-ECG-1",
+  "case_id": "DEMO-001",
+  "ecg_id": "DEMO-001-ECG-1",
+  "analysis_id": "AN-DEMO-001-ECG-1",
+  "synthetic": true,
+  "status": "queued",
+  "result": null,
+  "error": null
+}

@@ -1,0 +1,9 @@
+.omx/
+.omc/
+node_modules/
+tmp/
+output/
+.env
+.env.*
+*.log
+.DS_Store
