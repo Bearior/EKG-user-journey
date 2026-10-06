@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node scripts/serve.mjs",
     "test": "node --test --test-isolation=none",
-    "check": "node --check src/app.js && node --check src/model.js && node --check src/api.js && node --check src/ecg.js && node --check scripts/serve.mjs"
+    "check": "node --check src/app.js && node --check src/model.js && node --check src/api.js && node --check src/ecg.js && node --check src/intake-tools.js && node --check scripts/serve.mjs"
   },
   "engines": { "node": ">=24" }
 }

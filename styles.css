@@ -240,3 +240,15 @@ main{padding:21px 15px 12px}
 
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}
 }
+.case-id-controls{display:flex;gap:10px;align-items:center}
+.case-strip strong{overflow-wrap:anywhere}
+.case-id-controls input{min-width:0;flex:1;font-size:12px}
+.case-id-controls .btn{white-space:nowrap;flex-shrink:0;font-size:12px}
+.symptom-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.mic-button{display:inline-flex;align-items:center;gap:8px;min-width:115px;justify-content:center}
+.mic-button.recording{background:#fff0ef;border-color:#bc695f;color:#92473f}
+.stop-icon{width:12px;height:12px;border-radius:2px;background:currentColor}
+.speech-preview{font-size:12px;font-weight:400;color:#526779;line-height:1.7;overflow-wrap:anywhere}
+.speech-preview:empty{display:none}
+textarea[readonly]{background:#f3f8fa}
+@media(max-width:400px){.case-id-controls{flex-wrap:wrap}.case-id-controls .btn{width:100%}.symptom-heading{gap:8px}.mic-button{font-size:12px;min-width:105px}}

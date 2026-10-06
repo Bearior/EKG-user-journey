@@ -5,7 +5,7 @@ import { resolve, extname } from 'node:path';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const port = Number(process.env.PORT || 4173);
-const allowed = new Set(['/index.html', '/styles.css', '/src/app.js', '/src/model.js', '/src/api.js', '/src/ecg.js', '/examples/synthetic-ecg.json']);
+const allowed = new Set(['/index.html', '/styles.css', '/src/app.js', '/src/model.js', '/src/api.js', '/src/ecg.js', '/src/intake-tools.js', '/examples/synthetic-ecg.json']);
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 createServer(async (req, res) => {
   try {

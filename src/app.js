@@ -1,5 +1,6 @@
 import { scenarios, createCase, addRecord, confirmRecord, sendConsultation, retryConsultation, completeAnalysis, reviewRecord, aiVisible, parseFixture } from './model.js';
 import { ecgSvg } from './ecg.js';
+import { generateDemoCaseId, createDictation } from './intake-tools.js';
 
 const app = document.querySelector('#app');
 const steps = ['รับ ECG', 'ตรวจและส่งปรึกษา', 'ผลประเมิน', 'แพทย์รีวิว'];
@@ -9,8 +10,32 @@ let screen = 0;
 let mode = 'assist';
 let online = true;
 let notice = '';
-let intake = { caseId: 'DEMO-001', symptoms: 'ข้อมูลสมมติ: แน่นหน้าอกมา 30 นาที ระหว่างนำส่งโรงพยาบาล', scenario: 'stemi' };
+let intake = { caseId: generateDemoCaseId(), symptoms: '', scenario: 'stemi' };
 const drafts = new Map();
+let speechState = 'idle';
+let speechMessage = 'กดไมค์เพื่อพูดอาการเป็นข้อความภาษาไทย';
+let speechPreview = '';
+const microphoneIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>';
+const dictation = createDictation(window.SpeechRecognition ?? window.webkitSpeechRecognition, {
+  onText(text) { intake.symptoms = text; const field = document.querySelector('#symptoms'); if (field) field.value = text; },
+  onPreview(text) { speechPreview = text; updateSpeechControls(); },
+  onState(state, message) { speechState = state; speechMessage = message; updateSpeechControls(); }
+});
+function updateSpeechControls() {
+  const active = dictation.active;
+  const mic = document.querySelector('#dictate');
+  if (!mic) return;
+  mic.innerHTML = active ? '<span class="stop-icon" aria-hidden="true"></span>หยุดพูด' : microphoneIcon + 'พูดอาการ';
+  mic.setAttribute('aria-pressed', String(active));
+  mic.disabled = !dictation.supported || speechState === 'stopping';
+  mic.classList.toggle('recording', active);
+  const field = document.querySelector('#symptoms');
+  field.readOnly = active;
+  document.querySelector('#speech-status').textContent = dictation.supported ? speechMessage : 'browser นี้ไม่รองรับพูดเป็นข้อความ ใช้การพิมพ์แทน';
+  document.querySelector('#speech-preview').textContent = speechPreview ? 'กำลังถอดเสียง: ' + speechPreview.slice(0, 200) : '';
+  document.querySelector('#intake-form button[type="submit"]').disabled = active;
+  document.querySelector('#fixture').disabled = active;
+}
 
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const time = value => new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(value));
@@ -44,7 +69,7 @@ function shell(content) {
 
 function intakeScreen() {
   const options = Object.entries(scenarios).map(([value, item]) => `<label class="scenario-option"><input type="radio" name="scenario" value="${value}" ${intake.scenario === value ? 'checked' : ''}><span><strong>${item.name}</strong><small>${value === 'unreadable' ? 'ทดสอบทางออกเมื่อ AI ใช้งานไม่ได้' : 'กำหนดผลลัพธ์จำลองสำหรับเดินเรื่อง'}</small></span></label>`).join('');
-  return `<div class="intake-layout"><section class="panel"><div class="panel-heading"><h2>ข้อมูลสำหรับเริ่มเคส</h2><span class="badge subtle">ข้อมูลสมมติ</span></div><form id="intake-form"><label class="field">รหัสเคส<input id="case-id" name="caseId" value="${escape(intake.caseId)}" maxlength="29" pattern="DEMO-[A-Z0-9-]{1,24}" required aria-describedby="case-help"><small id="case-help">ขึ้นต้นด้วย DEMO- ไม่ใช้ชื่อหรือข้อมูลผู้ป่วยจริง</small></label><label class="field">อาการและบริบทสั้น ๆ<textarea id="symptoms" name="symptoms" rows="3" maxlength="400">${escape(intake.symptoms)}</textarea><small>ไม่ต้องกรอกข้อมูลครบเพื่อเดินต้นแบบ</small></label><fieldset class="scenario-fieldset"><legend>เลือกสถานการณ์สาธิต</legend><div class="scenario-grid">${options}</div></fieldset><button class="btn primary wide" type="submit">${currentCase ? 'เริ่มเคสสาธิตใหม่' : 'ใช้ ECG สังเคราะห์และเริ่มเคส'}</button>${currentCase ? '<p class="hint">เริ่มเคสใหม่จะล้างประวัติเคสสาธิตปัจจุบัน</p>' : ''}</form></section>
+  return `<div class="intake-layout"><section class="panel"><div class="panel-heading"><h2>ข้อมูลสำหรับเริ่มเคส</h2><span class="badge subtle">ข้อมูลสมมติ</span></div><form id="intake-form"><div class="field"><label for="case-id">รหัสเคส</label><div class="case-id-controls"><input id="case-id" name="caseId" value="${escape(intake.caseId)}" maxlength="29" pattern="DEMO-[A-Z0-9-]{1,24}" required aria-describedby="case-help"><button type="button" class="btn secondary" data-action="generate-id"><span aria-hidden="true">↻</span> สร้างรหัสใหม่</button></div><small id="case-help">สร้างรหัสให้อัตโนมัติแล้ว กดสร้างใหม่ได้ในคลิกเดียว ไม่ใช้ข้อมูลผู้ป่วยจริง</small></div><div class="field"><div class="symptom-heading"><label for="symptoms">อาการและบริบทสั้น ๆ</label><button id="dictate" type="button" class="btn secondary mic-button" data-action="dictate" aria-pressed="false" aria-describedby="speech-status">${microphoneIcon}พูดอาการ</button></div><textarea id="symptoms" name="symptoms" rows="3" maxlength="400" placeholder="พิมพ์เอง หรือกดไมค์แล้วพูดอาการสมมติเป็นภาษาไทย">${escape(intake.symptoms)}</textarea><small id="speech-status" role="status" aria-live="polite">${escape(speechMessage)}</small><span id="speech-preview" class="speech-preview"></span><small>ตรวจข้อความก่อนใช้ • บริการของ browser อาจส่งเสียงไปประมวลผลภายนอก ใช้เฉพาะข้อมูลสมมติ</small></div><fieldset class="scenario-fieldset"><legend>เลือกสถานการณ์สาธิต</legend><div class="scenario-grid">${options}</div></fieldset><button class="btn primary wide" type="submit">${currentCase ? 'เริ่มเคสสาธิตใหม่' : 'ใช้ ECG สังเคราะห์และเริ่มเคส'}</button>${currentCase ? '<p class="hint">เริ่มเคสใหม่จะล้างประวัติเคสสาธิตปัจจุบัน</p>' : ''}</form></section>
     <aside class="intake-aside"><div class="intro-visual"><span class="intro-icon" aria-hidden="true">↯</span><h2>อ่านได้เร็วขึ้น<br>ปรึกษาได้ต่อเนื่อง</h2><p>ส่ง ECG ให้แพทย์ได้ทันที<br>ให้ AI ประเมินควบคู่กัน</p><div class="mini-flow"><span>รับ ECG</span><span>AI + แพทย์</span><span>คำตอบ</span></div></div><section class="panel import-panel"><h3>มีไฟล์ตัวอย่างของโปรเจกต์?</h3><p>รับเฉพาะ JSON สังเคราะห์ตามตัวอย่าง ไม่อ่านไฟล์ ECG ของผู้ป่วยจริง</p><label class="file-button">เลือก JSON ตัวอย่าง<input id="fixture" type="file" accept=".json,application/json"></label><a class="text-link" href="examples/synthetic-ecg.json" download>ดาวน์โหลดไฟล์ตัวอย่าง</a></section></aside></div>`;
 }
 
@@ -90,9 +115,11 @@ function render() {
   const r = record();
   if (!r && screen > 0) screen = 0;
   app.innerHTML = shell(screen === 0 ? intakeScreen() : screen === 1 ? verifyScreen(r) : screen === 2 ? resultScreen(r) : reviewScreen(r));
+  if (screen === 0) updateSpeechControls();
 }
 function announce(message) { notice = message; document.querySelector('#announcement').textContent = message; }
 function navigate(next) {
+  dictation.cancel();
   screen = next;
   notice = '';
   render();
@@ -100,6 +127,7 @@ function navigate(next) {
 }
 function begin(data) {
   if (currentCase && !window.confirm('เริ่มเคสใหม่จะล้างประวัติเคสสาธิตปัจจุบัน ต้องการเริ่มใหม่หรือไม่?')) return;
+  dictation.cancel();
   currentCase = createCase(data.caseId, data.symptoms);
   selectedId = addRecord(currentCase, data.scenario).id;
   drafts.clear();
@@ -133,7 +161,10 @@ app.addEventListener('change', async e => {
 app.addEventListener('submit', e => {
   e.preventDefault();
   try {
-    if (e.target.id === 'intake-form') begin(intake);
+    if (e.target.id === 'intake-form') {
+      if (dictation.active) { announce('กดหยุดพูดและตรวจข้อความก่อนเริ่มเคส'); render(); return; }
+      begin(intake);
+    }
     if (e.target.id === 'review-form') {
       reviewRecord(record(), document.querySelector('#opinion').value, document.querySelector('#advice').value, mode);
       announce('บันทึกความเห็นแพทย์สมมติแล้ว ทีมหน้างานเห็นคำตอบในหน้าผลประเมิน');
@@ -150,6 +181,8 @@ app.addEventListener('click', e => {
     const action = target.dataset.action;
     if (!action) return;
     e.preventDefault();
+    if (action === 'generate-id') { intake.caseId = generateDemoCaseId(); document.querySelector('#case-id').value = intake.caseId; document.querySelector('#announcement').textContent = 'สร้างรหัสเคสใหม่แล้ว ' + intake.caseId; }
+    if (action === 'dictate') { if (dictation.active) dictation.stop(); else dictation.start(intake.symptoms); }
     if (action === 'home') navigate(0);
     if (action === 'verify') navigate(1);
     if (action === 'results') navigate(2);
@@ -190,4 +223,5 @@ app.addEventListener('click', e => {
   } catch (error) { announce(error.message); render(); }
 });
 
+window.addEventListener('pagehide', () => dictation.cancel());
 render();
