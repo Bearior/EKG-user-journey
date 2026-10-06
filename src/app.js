@@ -3,7 +3,7 @@ import { ecgSvg } from './ecg.js';
 import { generateDemoCaseId, createDictation } from './intake-tools.js';
 
 const app = document.querySelector('#app');
-const steps = ['รับ ECG', 'ตรวจและส่งปรึกษา', 'ผลประเมิน', 'แพทย์รีวิว'];
+const steps = ['เริ่มเคส', 'ตรวจและส่งปรึกษา', 'ติดตามผล', 'แพทย์รีวิว'];
 let currentCase = null;
 let selectedId = null;
 let screen = 0;
@@ -50,14 +50,14 @@ function shell(content) {
     <aside class="sidebar">
       <a class="brand" href="#" data-action="home"><span class="brand-icon" aria-hidden="true">↯</span><span>ECG Bridge<small>จากคลื่นหัวใจ สู่การปรึกษา</small></span></a>
       <div class="prototype-tag">ต้นแบบสำหรับแพทย์รีวิว</div>
-      <nav aria-label="ขั้นตอนการใช้งาน">${steps.map((step, i) => `<button type="button" class="nav-item ${screen === i ? 'active' : ''}" data-screen="${i}" ${!currentCase && i > 0 ? 'disabled' : ''} ${screen === i ? 'aria-current="step"' : ''}><span class="step-number">${i + 1}</span>${step}${i === 3 ? '<small>สลับบทบาท</small>' : ''}</button>`).join('')}</nav>
+      <nav aria-label="ขั้นตอนการใช้งาน">${steps.slice(0, 3).map((step, i) => `<button type="button" class="nav-item ${screen === i ? 'active' : ''}" data-screen="${i}" ${!currentCase && i > 0 ? 'disabled' : ''} ${screen === i ? 'aria-current="step"' : ''}><span class="step-number">${i + 1}</span>${step}</button>`).join('')}<div class="role-divider">สำหรับผู้สาธิต</div><button class="nav-item ${screen === 3 ? 'active' : ''}" data-screen="3" ${r?.consultation !== 'sent' ? 'disabled' : ''}>สลับเป็นแพทย์ (สาธิต)</button></nav>
       <div class="sidebar-bottom"><p>พื้นที่สาธิตเท่านั้น</p><span>ไม่มีการส่งข้อมูลถึงโรงพยาบาล<br>รีเฟรชหน้าเพื่อเริ่มใหม่</span></div>
     </aside>
     <div class="workspace">
       <header class="topbar"><div class="context-label">${screen === 3 ? 'มุมมองแพทย์ ER' : 'มุมมองทีมหน้างาน'}<span> / ${screen === 3 ? 'ผู้รับปรึกษาสมมติ' : 'รถฉุกเฉิน · ห้องฉุกเฉิน'}</span></div><label class="network-toggle"><input id="online" type="checkbox" ${online ? 'checked' : ''}><span class="connection-dot ${online ? 'online' : ''}"></span>${online ? 'เครือข่ายจำลองพร้อม' : 'เครือข่ายจำลองขาด'}</label></header>
       <div class="demo-banner"><span class="badge">สาธิต</span><span>ข้อมูลผู้ป่วย คลื่น ECG ผล AI และคำตอบแพทย์เป็นข้อมูลจำลองทั้งหมด</span></div>
       <main id="main" tabindex="-1">
-        <div class="page-heading"><div><p class="section-kicker">ขั้นตอน ${screen + 1} จาก 4</p><h1>${steps[screen]}</h1><p class="subtitle">${['เริ่มจาก ECG หนึ่งชุด พร้อมบริบทที่จำเป็น', 'ยืนยันเคส แล้วส่งให้แพทย์ได้โดยไม่ต้องรอ AI', 'ผล AI และความเห็นแพทย์ แสดงแยกจากกัน', 'อ่าน ECG บันทึกความเห็น และส่งคำตอบกลับ'][screen]}</p></div><label class="mode-select">รูปแบบการสาธิต<select id="mode" ${currentCase ? 'disabled' : ''}><option value="assist" ${mode === 'assist' ? 'selected' : ''}>AI ช่วยอ่าน</option><option value="research" ${mode === 'research' ? 'selected' : ''}>อ่านอิสระสำหรับวิจัย</option></select></label></div>
+        <div class="page-heading"><div><p class="section-kicker">${screen === 3 ? 'บทบาทแพทย์สาธิต' : `ขั้นตอน ${screen + 1} จาก 3 ของทีมหน้างาน`}</p><h1>${screen === 0 && currentCase ? 'เคสปัจจุบัน' : steps[screen]}</h1><p class="subtitle">${[currentCase ? 'กลับไปติดตามเคสเดิม หรือเริ่มเคสใหม่แยกกัน' : 'เริ่มจาก ECG หนึ่งชุด พร้อมบริบทที่จำเป็น', 'ยืนยันเคส แล้วส่งให้แพทย์ได้โดยไม่ต้องรอ AI', 'ผล AI และความเห็นแพทย์ แสดงแยกจากกัน', 'อ่าน ECG บันทึกความเห็น และส่งคำตอบกลับ'][screen]}</p></div><label class="mode-select">รูปแบบการสาธิต<select id="mode" ${currentCase ? 'disabled' : ''}><option value="assist" ${mode === 'assist' ? 'selected' : ''}>AI ช่วยอ่าน</option><option value="research" ${mode === 'research' ? 'selected' : ''}>อ่านอิสระสำหรับวิจัย</option></select></label></div>
         ${notice ? `<div class="notice" role="status">${escape(notice)}</div>` : ''}
         ${r && screen > 0 ? `<div class="case-strip"><div><span class="meta-label">รหัสเคสสมมติ</span><strong>${escape(currentCase.id)}</strong></div><div><span class="meta-label">ECG ที่กำลังเปิด</span><strong>ครั้งที่ ${r.number} <span class="muted">เวลา ${time(r.capturedAt)}</span></strong></div><div><span class="meta-label">สถานะปรึกษา</span><strong class="small-status">${consultationText(r)}</strong></div></div>` : ''}
         ${content}
@@ -69,7 +69,8 @@ function shell(content) {
 
 function intakeScreen() {
   const options = Object.entries(scenarios).map(([value, item]) => `<label class="scenario-option"><input type="radio" name="scenario" value="${value}" ${intake.scenario === value ? 'checked' : ''}><span><strong>${item.name}</strong><small>${value === 'unreadable' ? 'ทดสอบทางออกเมื่อ AI ใช้งานไม่ได้' : 'กำหนดผลลัพธ์จำลองสำหรับเดินเรื่อง'}</small></span></label>`).join('');
-  return `<div class="intake-layout"><section class="panel"><div class="panel-heading"><h2>ข้อมูลสำหรับเริ่มเคส</h2><span class="badge subtle">ข้อมูลสมมติ</span></div><form id="intake-form"><div class="field"><label for="case-id">รหัสเคส</label><div class="case-id-controls"><input id="case-id" name="caseId" value="${escape(intake.caseId)}" maxlength="29" pattern="DEMO-[A-Z0-9-]{1,24}" required aria-describedby="case-help"><button type="button" class="btn secondary" data-action="generate-id"><span aria-hidden="true">↻</span> สร้างรหัสใหม่</button></div><small id="case-help">สร้างรหัสให้อัตโนมัติแล้ว กดสร้างใหม่ได้ในคลิกเดียว ไม่ใช้ข้อมูลผู้ป่วยจริง</small></div><div class="field"><div class="symptom-heading"><label for="symptoms">อาการและบริบทสั้น ๆ</label><button id="dictate" type="button" class="btn secondary mic-button" data-action="dictate" aria-pressed="false" aria-describedby="speech-status">${microphoneIcon}พูดอาการ</button></div><textarea id="symptoms" name="symptoms" rows="3" maxlength="400" placeholder="พิมพ์เอง หรือกดไมค์แล้วพูดอาการสมมติเป็นภาษาไทย">${escape(intake.symptoms)}</textarea><small id="speech-status" role="status" aria-live="polite">${escape(speechMessage)}</small><span id="speech-preview" class="speech-preview"></span><small>ตรวจข้อความก่อนใช้ • บริการของ browser อาจส่งเสียงไปประมวลผลภายนอก ใช้เฉพาะข้อมูลสมมติ</small></div><fieldset class="scenario-fieldset"><legend>เลือกสถานการณ์สาธิต</legend><div class="scenario-grid">${options}</div></fieldset><button class="btn primary wide" type="submit">${currentCase ? 'เริ่มเคสสาธิตใหม่' : 'ใช้ ECG สังเคราะห์และเริ่มเคส'}</button>${currentCase ? '<p class="hint">เริ่มเคสใหม่จะล้างประวัติเคสสาธิตปัจจุบัน</p>' : ''}</form></section>
+  const resume = currentCase ? `<section class="panel resume-panel"><div><span class="meta-label">เคสที่กำลังทำอยู่</span><h2>${escape(currentCase.id)}</h2><p>มี ECG ${currentCase.records.length} ชุด ข้อมูลยังอยู่ กดกลับไปทำต่อได้</p></div>${button('กลับไปเคสปัจจุบัน', 'resume', 'primary')}</section>` : '';
+  return `${resume}<div class="intake-layout"><section class="panel">${currentCase ? '<details class="new-case-details"><summary>เริ่มเคสใหม่แยกจากเคสปัจจุบัน</summary>' : ''}<div class="panel-heading"><h2>ข้อมูลสำหรับเริ่มเคส</h2><span class="badge subtle">ข้อมูลสมมติ</span></div><form id="intake-form"><div class="field"><label for="case-id">รหัสเคส</label><div class="case-id-controls"><input id="case-id" name="caseId" value="${escape(intake.caseId)}" maxlength="29" pattern="DEMO-[A-Z0-9-]{1,24}" required aria-describedby="case-help"><button type="button" class="btn secondary" data-action="generate-id"><span aria-hidden="true">↻</span> สร้างรหัสใหม่</button></div><small id="case-help">สร้างรหัสให้อัตโนมัติแล้ว กดสร้างใหม่ได้ในคลิกเดียว ไม่ใช้ข้อมูลผู้ป่วยจริง</small></div><div class="field"><div class="symptom-heading"><label for="symptoms">อาการและบริบทสั้น ๆ</label><button id="dictate" type="button" class="btn secondary mic-button" data-action="dictate" aria-pressed="false" aria-describedby="speech-status">${microphoneIcon}พูดอาการ</button></div><textarea id="symptoms" name="symptoms" rows="3" maxlength="400" placeholder="พิมพ์เอง หรือกดไมค์แล้วพูดอาการสมมติเป็นภาษาไทย">${escape(intake.symptoms)}</textarea><small id="speech-status" role="status" aria-live="polite">${escape(speechMessage)}</small><span id="speech-preview" class="speech-preview"></span><small>ตรวจข้อความก่อนใช้ • บริการของ browser อาจส่งเสียงไปประมวลผลภายนอก ใช้เฉพาะข้อมูลสมมติ</small></div><fieldset class="scenario-fieldset"><legend>เลือกสถานการณ์สาธิต</legend><div class="scenario-grid">${options}</div></fieldset><button class="btn primary wide" type="submit">${currentCase ? 'เริ่มเคสสาธิตใหม่' : 'ใช้ ECG สังเคราะห์และเริ่มเคส'}</button>${currentCase ? '<p class="hint">ใช้เมื่อเริ่มผู้ป่วยสมมติคนใหม่เท่านั้น ประวัติเคสเดิมจะถูกล้างหลังยืนยัน</p>' : ''}</form>${currentCase ? '</details>' : ''}</section>
     <aside class="intake-aside"><div class="intro-visual"><span class="intro-icon" aria-hidden="true">↯</span><h2>อ่านได้เร็วขึ้น<br>ปรึกษาได้ต่อเนื่อง</h2><p>ส่ง ECG ให้แพทย์ได้ทันที<br>ให้ AI ประเมินควบคู่กัน</p><div class="mini-flow"><span>รับ ECG</span><span>AI + แพทย์</span><span>คำตอบ</span></div></div><section class="panel import-panel"><h3>มีไฟล์ตัวอย่างของโปรเจกต์?</h3><p>รับเฉพาะ JSON สังเคราะห์ตามตัวอย่าง ไม่อ่านไฟล์ ECG ของผู้ป่วยจริง</p><label class="file-button">เลือก JSON ตัวอย่าง<input id="fixture" type="file" accept=".json,application/json"></label><a class="text-link" href="examples/synthetic-ecg.json" download>ดาวน์โหลดไฟล์ตัวอย่าง</a></section></aside></div>`;
 }
 
@@ -83,6 +84,7 @@ function history(r) {
 
 function consult(r) {
   const sent = r.consultation === 'sent';
+  if (sent) return `<section class="panel sent-summary"><h2>ส่งปรึกษาแล้ว</h2><p>${consultationText(r)}</p><p class="hint">ไม่มีการส่งซ้ำ ดูคำตอบในช่องความเห็นแพทย์ด้านบน</p></section>`;
   return `<section class="panel consultation-panel"><div class="panel-heading"><h2>ส่งให้แพทย์ ER</h2><span class="badge ${sent ? 'subtle' : 'pending'}">${sent ? 'ส่งจำลองแล้ว' : 'รอส่ง'}</span></div><p>ส่ง ECG และบริบทที่แสดงบนหน้านี้ได้ทันที แม้ AI ยังไม่เสร็จ</p><label class="confirm-label"><input id="confirm-record" type="checkbox" ${r.confirmed ? 'checked' : ''} ${sent ? 'disabled' : ''}><span>ยืนยันว่าเป็นเคส <strong>${escape(currentCase.id)}</strong><br>ECG ครั้งที่ ${r.number} เวลา ${time(r.capturedAt)}</span></label>${r.consultation === 'queued' ? '<p class="callout warning">ยังส่งไม่สำเร็จ เปิดเครือข่ายจำลองแล้วกดส่งอีกครั้ง ระหว่างนี้ใช้ช่องทางปรึกษาเดิม</p>' : ''}<div class="action-row">${button(r.consultation === 'queued' ? 'จำลองส่งอีกครั้ง' : 'จำลองส่งปรึกษา', 'send', 'primary', sent || !r.confirmed)}${sent ? button('เปิดมุมมองแพทย์', 'doctor', 'secondary') : ''}</div><p class="hint">ไม่มีการแจ้งเตือนหรือส่งข้อมูลถึงแพทย์จริง</p></section>`;
 }
 
@@ -90,11 +92,11 @@ function aiPanel(r, role = 'field') {
   if (!aiVisible(r, mode, role)) return `<section class="panel ai-panel"><div class="panel-heading"><h2>ผล AI</h2><span class="badge subtle">ซ่อนผล</span></div><div class="hidden-ai"><span aria-hidden="true">▣</span><h3>อ่าน ECG อย่างอิสระก่อน</h3><p>ผล AI จะแสดงหลังบันทึกความเห็นแพทย์ เพื่อสาธิตการลดการชี้นำในการศึกษา</p></div></section>`;
   const pending = r.analysis.status === 'pending';
   const item = scenarios[r.analysis.result ?? r.scenario];
-  return `<section class="panel ai-panel"><div class="panel-heading"><h2>ผลประเมินจาก AI</h2><span class="badge ${pending ? 'pending' : 'subtle'}">${pending ? 'รอผลจำลอง' : 'ผลจำลอง'}</span></div>${pending ? `<div class="pending-result"><div class="signal-mark" aria-hidden="true">∿</div><h3>ยังไม่มีผล AI</h3><p>ส่งปรึกษาได้ก่อน ปุ่มด้านล่างใช้จำลองจังหวะที่ AI ส่งผลกลับ</p>${button('จำลองให้ AI ประเมินเสร็จ', 'finish-ai', 'secondary')}</div>` : `<div class="result-block ${item.variant}"><span class="result-icon" aria-hidden="true">${r.analysis.status === 'failed' ? '!' : '∿'}</span><div><h3>${item.label}</h3><p>${item.description}</p></div></div><p class="hint">ผลของ ECG ครั้งที่ ${r.number} เวลา ${time(r.capturedAt)} เท่านั้น • ไม่มีคะแนนความมั่นใจทางคลินิก</p>`}${button('ดู JSON สำหรับ API', 'api-json', 'secondary')}</section>`;
+  return `<section class="panel ai-panel"><div class="panel-heading"><h2>ผลประเมินจาก AI</h2><span class="badge ${pending ? 'pending' : 'subtle'}">${pending ? 'รอผลจำลอง' : 'ผลจำลอง'}</span></div>${pending ? `<div class="pending-result"><div class="signal-mark" aria-hidden="true">∿</div><h3>ยังไม่มีผล AI</h3><p>AI จำลองจะตอบอัตโนมัติภายในประมาณ 2 วินาที ส่งปรึกษาได้โดยไม่ต้องรอ</p></div>` : `<div class="result-block ${item.variant}"><span class="result-icon" aria-hidden="true">${r.analysis.status === 'failed' ? '!' : '∿'}</span><div><h3>${item.label}</h3><p>${item.description}</p></div></div><p class="hint">ผลของ ECG ครั้งที่ ${r.number} เวลา ${time(r.capturedAt)} เท่านั้น • ไม่มีคะแนนความมั่นใจทางคลินิก</p>`}<details class="demo-tools"><summary>เครื่องมือผู้สาธิต / JSON API</summary>${pending ? button('จำลองให้ AI ประเมินเสร็จ', 'finish-ai', 'secondary') : ''}${button('ดู JSON สำหรับ API', 'api-json', 'secondary')}</details></section>`;
 }
 
 function physicianPanel(r) {
-  return `<section class="panel physician-panel"><div class="panel-heading"><h2>ความเห็นแพทย์</h2><span class="badge ${r.review ? 'subtle' : 'pending'}">${r.review ? 'บันทึกแล้ว' : 'ยังไม่รีวิว'}</span></div>${r.review ? `<div class="review-content"><p class="meta-label">${escape(r.review.author)} · ${time(r.review.at)}</p><h3>${escape(r.review.opinion)}</h3><p class="preserve-lines">${escape(r.review.advice)}</p><p class="hint">ความเห็นและคำตอบสมมติ ไม่ใช่คำสั่งรักษา</p></div>` : `<p>ยังไม่มีความเห็นแพทย์สำหรับ ECG ชุดนี้ ผล AI ไม่เปลี่ยนสถานะนี้</p>${button('ไปหน้าจำลองแพทย์รีวิว', 'doctor', 'secondary')}`}</section>`;
+  return `<section class="panel physician-panel"><div class="panel-heading"><h2>ความเห็นแพทย์</h2><span class="badge ${r.review ? 'subtle' : 'pending'}">${r.review ? 'บันทึกแล้ว' : 'ยังไม่รีวิว'}</span></div>${r.review ? `<div class="review-content"><p class="meta-label">${escape(r.review.author)} · ${time(r.review.at)}</p><h3>${escape(r.review.opinion)}</h3><p class="preserve-lines">${escape(r.review.advice)}</p><p class="hint">ความเห็นและคำตอบสมมติ ไม่ใช่คำสั่งรักษา</p></div>` : `<p>ยังไม่มีความเห็นแพทย์สำหรับ ECG ชุดนี้ ผล AI ไม่เปลี่ยนสถานะนี้</p>${button('สลับเป็นแพทย์เพื่อตอบเคสนี้ (สาธิต)', 'doctor', 'secondary', r.consultation !== 'sent')}`}</section>`;
 }
 
 function reviewScreen(r) {
@@ -104,7 +106,7 @@ function reviewScreen(r) {
 }
 
 function resultScreen(r) {
-  return `${waveform(r)}<div class="content-grid"><div><div class="result-columns">${aiPanel(r)}${physicianPanel(r)}</div>${consult(r)}<section class="panel"><div class="panel-heading"><h2>เหตุการณ์ของ ECG ชุดนี้</h2></div><ol class="timeline">${r.events.map(item => `<li><time>${time(item.at)}</time><span>${escape(item.text)}</span></li>`).join('')}</ol></section></div><aside>${history(r)}</aside></div>`;
+  return `<div class="content-grid"><div><div class="result-columns">${aiPanel(r)}${physicianPanel(r)}</div>${waveform(r)}${consult(r)}<section class="panel"><div class="panel-heading"><h2>เหตุการณ์ของ ECG ชุดนี้</h2></div><ol class="timeline">${r.events.map(item => `<li><time>${time(item.at)}</time><span>${escape(item.text)}</span></li>`).join('')}</ol></section></div><aside>${history(r)}</aside></div>`;
 }
 
 function verifyScreen(r) {
@@ -112,26 +114,41 @@ function verifyScreen(r) {
 }
 
 function render() {
+  const previous = document.activeElement;
+  const focusId = ['INPUT', 'TEXTAREA', 'SELECT'].includes(previous?.tagName) ? previous.id : null;
+  const selection = previous?.tagName === 'TEXTAREA' ? [previous.selectionStart, previous.selectionEnd] : null;
   const r = record();
   if (!r && screen > 0) screen = 0;
   app.innerHTML = shell(screen === 0 ? intakeScreen() : screen === 1 ? verifyScreen(r) : screen === 2 ? resultScreen(r) : reviewScreen(r));
   if (screen === 0) updateSpeechControls();
+  const restored = focusId ? document.getElementById(focusId) : null;
+  if (restored && !restored.disabled) { restored.focus(); if (selection) restored.setSelectionRange(...selection); }
 }
 function announce(message) { notice = message; document.querySelector('#announcement').textContent = message; }
+function queueAnalysis(c, r) {
+  setTimeout(() => {
+    completeAnalysis(c, r.id);
+    if (currentCase === c) { render(); document.querySelector('#announcement').textContent = 'AI จำลองตอบแล้วสำหรับ ECG ครั้งที่ ' + r.number; }
+  }, 2000);
+}
 function navigate(next) {
   dictation.cancel();
   screen = next;
   notice = '';
   render();
   document.querySelector('#main').focus();
+  window.scrollTo(0, 0);
 }
 function begin(data) {
+  if (currentCase && data.caseId === currentCase.id) throw new Error('เคสใหม่ต้องใช้รหัสใหม่ กดสร้างรหัสใหม่ก่อนเริ่ม');
   if (currentCase && !window.confirm('เริ่มเคสใหม่จะล้างประวัติเคสสาธิตปัจจุบัน ต้องการเริ่มใหม่หรือไม่?')) return;
   dictation.cancel();
   currentCase = createCase(data.caseId, data.symptoms);
-  selectedId = addRecord(currentCase, data.scenario).id;
+  const added = addRecord(currentCase, data.scenario);
+  selectedId = added.id;
+  queueAnalysis(currentCase, added);
   drafts.clear();
-  intake = { ...data };
+  intake = { caseId: generateDemoCaseId(), symptoms: '', scenario: 'stemi' };
   navigate(1);
 }
 
@@ -167,7 +184,8 @@ app.addEventListener('submit', e => {
     }
     if (e.target.id === 'review-form') {
       reviewRecord(record(), document.querySelector('#opinion').value, document.querySelector('#advice').value, mode);
-      announce('บันทึกความเห็นแพทย์สมมติแล้ว ทีมหน้างานเห็นคำตอบในหน้าผลประเมิน');
+      navigate(2);
+      announce('แพทย์สมมติตอบกลับแล้ว ดูคำตอบในช่องความเห็นแพทย์');
       render();
     }
   } catch (error) { announce(error.message); render(); }
@@ -183,18 +201,20 @@ app.addEventListener('click', e => {
     e.preventDefault();
     if (action === 'generate-id') { intake.caseId = generateDemoCaseId(); document.querySelector('#case-id').value = intake.caseId; document.querySelector('#announcement').textContent = 'สร้างรหัสเคสใหม่แล้ว ' + intake.caseId; }
     if (action === 'dictate') { if (dictation.active) dictation.stop(); else dictation.start(intake.symptoms); }
-    if (action === 'home') navigate(0);
+    if (action === 'home') navigate(currentCase ? 2 : 0);
+    if (action === 'resume') navigate(record()?.consultation === 'unsent' ? 1 : 2);
     if (action === 'verify') navigate(1);
     if (action === 'results') navigate(2);
     if (action === 'doctor') navigate(3);
     if (action === 'send') {
       const r = record();
       if (r.consultation === 'queued') retryConsultation(r, online); else sendConsultation(r, online);
+      if (r.consultation === 'sent') navigate(2);
       announce(online ? 'จำลองส่งปรึกษาแล้ว โดยไม่รอผล AI — ยังไม่มีแพทย์รับอ่าน' : 'ยังส่งไม่สำเร็จ เปิดเครือข่ายจำลองแล้วกดส่งอีกครั้ง');
       render();
     }
     if (action === 'finish-ai') { completeAnalysis(currentCase, selectedId); announce('อัปเดตผล AI จำลองสำหรับ ECG ชุดนี้แล้ว'); render(); }
-    if (action === 'new-record') { selectedId = addRecord(currentCase, document.querySelector('#next-scenario').value).id; navigate(1); announce('เพิ่ม ECG ชุดใหม่แล้ว ต้องยืนยันเคสอีกครั้ง ผลเก่ายังคงอยู่ใน ECG ชุดเดิม'); render(); }
+    if (action === 'new-record') { const added = addRecord(currentCase, document.querySelector('#next-scenario').value); selectedId = added.id; queueAnalysis(currentCase, added); navigate(1); announce('เพิ่ม ECG ชุดใหม่แล้ว ต้องยืนยันเคสอีกครั้ง ผลเก่ายังคงอยู่ใน ECG ชุดเดิม'); render(); }
     if (action === 'api-json' && aiVisible(record(), mode, screen === 3 ? 'doctor' : 'field')) {
       const r = record();
       const request = r.analysis.request;

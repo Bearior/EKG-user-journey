@@ -11,7 +11,7 @@
 - [x] Implement src/model.js and rerun tests (15 model/API tests passing).
 - [x] Implement index.html, src/app.js, src/ecg.js and styles.css: intake, ECG verification, AI result, doctor review; scenario controls, record history, failure handling and responsive UI.
 - [x] Add synthetic JSON example, loopback static server, README and separate flowchart/review documents.
-- [x] Verify syntax/model/API tests and seven HTTP assets; independent code review findings corrected. Browser walkthrough attempted but denied by browser policy; desktop/mobile appearance remains unverified.
+- [x] Verify syntax/model/API tests and seven HTTP assets; independent code review findings corrected. Initial browser attempt was denied; subsequently resolved. Chrome desktop/mobile flows were exercised and visual layout checked; see docs/ux-review.md.
 - [x] Initialize main Git branch, review staged files and prepare verified prototype commit with local run instructions.
 
 ## Review focus
@@ -27,5 +27,5 @@ Ruling: Markdown documents with Mermaid satisfy the requested separate documenta
 Ruling: No dependencies added; modern browser and Node 24+ are the tested target. Testing targets workflow boundaries, not diagnostic performance.
 Ruling: User added an inference API JSON contract. src/api.js creates versioned synthetic request/accepted/terminal response locally; no trained model or inference endpoint is implemented.
 Review fixes: research mode locked after intake, AI hidden across all screens until review, no AI-comparison opinion during independent reading, and queued records labelled as failed sends in history.
-Validation gap: Chrome localhost access was denied by browser policy; no visual/browser walkthrough is claimed. Model/contract tests, syntax checks and HTTP asset smoke checks are used instead.
+Initial validation gap: Chrome localhost access was denied. Later browser permission allowed a real Chrome walkthrough and 390px mobile layout review. Updated evidence is in docs/ux-review.md; real microphone recognition remains unverified.
 Final evidence: 15/15 tests passing; npm run check passing; seven HTTP assets return 200; independent reviewer approves mock prototype. Future opaque backend analysis ID handling is documented in the API integration section and remains work for real transport.

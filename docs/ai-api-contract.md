@@ -6,7 +6,7 @@
 
 - `src/api.js` สร้าง request JSON และ response JSON ภายใน browser ไม่มี `fetch` และไม่มี HTTP call ไปหา AI
 - เมื่อรับ ECG ระบบสร้าง request และจำลอง response `queued`
-- ปุ่ม **จำลองให้ AI ประเมินเสร็จ** จำลอง response `succeeded` หรือ `failed` ตามสถานการณ์ที่ผู้สาธิตเลือก
+- หลังรับ ECG ประมาณ 2 วินาที เดโมสร้าง response `succeeded` หรือ `failed` อัตโนมัติตาม scenario ปุ่มจำลองให้เสร็จทันทีและดู JSON อยู่ในเครื่องมือผู้สาธิต
 - `src/model.js` ตรวจ `schema_version`, `case_id`, `ecg_id`, `request_id`, `analysis_id` และผลลัพธ์ก่อนใช้ response ป้องกันผลของ ECG คนละชุดปะปนกัน
 - ปุ่ม **ดู JSON สำหรับ API** แสดง request preview และ response พร้อมดาวน์โหลด request เต็ม ในโหมดอ่านอิสระปุ่มนี้ถูกซ่อนด้วยจนบันทึกความเห็น
 - Request มี waveform สังเคราะห์ 12 × 1000 samples ผลคลาสถูกกำหนดจาก scenario นอก request ไม่ได้คำนวณจาก waveform
