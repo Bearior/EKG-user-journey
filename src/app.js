@@ -1,247 +1,142 @@
-import { scenarios, createCase, addRecord, confirmRecord, sendConsultation, retryConsultation, completeAnalysis, reviewRecord, aiVisible, parseFixture } from './model.js';
-import { ecgSvg } from './ecg.js';
-import { generateDemoCaseId, createDictation } from './intake-tools.js';
+import { escape, timeLabel, sizeLabel, reportMarkup, reportUrl } from './report-ui.js';
 
 const app = document.querySelector('#app');
-const steps = ['เริ่มเคส', 'ตรวจและส่งปรึกษา', 'ติดตามผล', 'แพทย์รีวิว'];
-let currentCase = null;
-let selectedId = null;
-let screen = 0;
-let mode = 'assist';
-let online = true;
-let notice = '';
-let intake = { caseId: generateDemoCaseId(), symptoms: '', scenario: 'stemi' };
-const drafts = new Map();
-let speechState = 'idle';
-let speechMessage = 'กดไมค์เพื่อพูดอาการเป็นข้อความภาษาไทย';
-let speechPreview = '';
-const microphoneIcon = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg>';
-const dictation = createDictation(window.SpeechRecognition ?? window.webkitSpeechRecognition, {
-  onText(text) { intake.symptoms = text; const field = document.querySelector('#symptoms'); if (field) field.value = text; },
-  onPreview(text) { speechPreview = text; updateSpeechControls(); },
-  onState(state, message) { speechState = state; speechMessage = message; updateSpeechControls(); }
-});
-function updateSpeechControls() {
-  const active = dictation.active;
-  const mic = document.querySelector('#dictate');
-  if (!mic) return;
-  mic.innerHTML = active ? '<span class="stop-icon" aria-hidden="true"></span>หยุดพูด' : microphoneIcon + 'พูดอาการ';
-  mic.setAttribute('aria-pressed', String(active));
-  mic.disabled = !dictation.supported || speechState === 'stopping';
-  mic.classList.toggle('recording', active);
-  const field = document.querySelector('#symptoms');
-  field.readOnly = active;
-  document.querySelector('#speech-status').textContent = dictation.supported ? speechMessage : 'browser นี้ไม่รองรับพูดเป็นข้อความ ใช้การพิมพ์แทน';
-  document.querySelector('#speech-preview').textContent = speechPreview ? 'กำลังถอดเสียง: ' + speechPreview.slice(0, 200) : '';
-  document.querySelector('#intake-form button[type="submit"]').disabled = active;
-  document.querySelector('#fixture').disabled = active;
-}
+const paths = {
+  pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  upload: '<path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m21 16-6-6L3 21"/>',
+  file: '<path d="M14 2H5v20h14V7zM14 2v6h5M8 13h8M8 17h6"/>',
+  copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
+  print: '<path d="M6 8V2h12v6M6 17H3V8h18v9h-3M6 14h12v8H6z"/>',
+  arrow: '<path d="M19 12H5m6-6-6 6 6 6"/>',
+  search: '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>'
+};
+const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]}</svg>`;
+const sharedId = location.pathname.match(/^\/reports\/([a-f0-9-]+)$/i)?.[1];
+let view = sharedId ? 'report' : 'upload';
+let report = null, history = [], files = [];
+let historyLoaded = false, historyError = '', kind = 'image', patientCode = '', notes = '', search = '', error = '', notice = '';
+let processing = false, loading = Boolean(sharedId), copyFallback = false, reportSequence = 0;
 
-const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-const time = value => new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(value));
-const date = value => new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));
-const record = () => currentCase?.records.find(item => item.id === selectedId);
-const button = (label, action, kind = 'primary', disabled = false) => `<button type="button" class="btn ${kind}" data-action="${action}" ${disabled ? 'disabled' : ''}>${label}</button>`;
-const consultationText = r => ({ unsent: 'ยังไม่ได้ส่งปรึกษา', queued: 'ยังส่งไม่สำเร็จ • รอส่งอีกครั้ง', sent: r.review ? 'แพทย์ ER สมมติบันทึกคำตอบแล้ว' : 'จำลองส่งสำเร็จ • ยังไม่มีแพทย์รับอ่าน' }[r.consultation]);
+async function api(path, options) {
+  const response = await fetch(path, options);
+  let data;
+  try { data = await response.json(); } catch { throw new Error('Server ตอบกลับไม่ถูกต้อง ลองใหม่อีกครั้ง'); }
+  if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'ไม่สามารถทำรายการได้');
+  return data;
+}
 
 function shell(content) {
-  const r = record();
-  return `<div class="layout">
-    <aside class="sidebar">
-      <a class="brand" href="#" data-action="home"><span class="brand-icon" aria-hidden="true">↯</span><span>ECG Bridge<small>จากคลื่นหัวใจ สู่การปรึกษา</small></span></a>
-      <div class="prototype-tag">ต้นแบบสำหรับแพทย์รีวิว</div>
-      <nav aria-label="ขั้นตอนการใช้งาน">${steps.slice(0, 3).map((step, i) => `<button type="button" class="nav-item ${screen === i ? 'active' : ''}" data-screen="${i}" ${!currentCase && i > 0 ? 'disabled' : ''} ${screen === i ? 'aria-current="step"' : ''}><span class="step-number">${i + 1}</span>${step}</button>`).join('')}<div class="role-divider">สำหรับผู้สาธิต</div><button class="nav-item ${screen === 3 ? 'active' : ''}" data-screen="3" ${r?.consultation !== 'sent' ? 'disabled' : ''}>สลับเป็นแพทย์ (สาธิต)</button></nav>
-      <div class="sidebar-bottom"><p>พื้นที่สาธิตเท่านั้น</p><span>ไม่มีการส่งข้อมูลถึงโรงพยาบาล<br>รีเฟรชหน้าเพื่อเริ่มใหม่</span></div>
-    </aside>
-    <div class="workspace">
-      <header class="topbar"><div class="context-label">${screen === 3 ? 'มุมมองแพทย์ ER' : 'มุมมองทีมหน้างาน'}<span> / ${screen === 3 ? 'ผู้รับปรึกษาสมมติ' : 'รถฉุกเฉิน · ห้องฉุกเฉิน'}</span></div><label class="network-toggle"><input id="online" type="checkbox" ${online ? 'checked' : ''}><span class="connection-dot ${online ? 'online' : ''}"></span>${online ? 'เครือข่ายจำลองพร้อม' : 'เครือข่ายจำลองขาด'}</label></header>
-      <div class="demo-banner"><span class="badge">สาธิต</span><span>ข้อมูลผู้ป่วย คลื่น ECG ผล AI และคำตอบแพทย์เป็นข้อมูลจำลองทั้งหมด</span></div>
-      <main id="main" tabindex="-1">
-        <div class="page-heading"><div><p class="section-kicker">${screen === 3 ? 'บทบาทแพทย์สาธิต' : `ขั้นตอน ${screen + 1} จาก 3 ของทีมหน้างาน`}</p><h1>${screen === 0 && currentCase ? 'เคสปัจจุบัน' : steps[screen]}</h1><p class="subtitle">${[currentCase ? 'กลับไปติดตามเคสเดิม หรือเริ่มเคสใหม่แยกกัน' : 'เริ่มจาก ECG หนึ่งชุด พร้อมบริบทที่จำเป็น', 'ยืนยันเคส แล้วส่งให้แพทย์ได้โดยไม่ต้องรอ AI', 'ผล AI และความเห็นแพทย์ แสดงแยกจากกัน', 'อ่าน ECG บันทึกความเห็น และส่งคำตอบกลับ'][screen]}</p></div><label class="mode-select">รูปแบบการสาธิต<select id="mode" ${currentCase ? 'disabled' : ''}><option value="assist" ${mode === 'assist' ? 'selected' : ''}>AI ช่วยอ่าน</option><option value="research" ${mode === 'research' ? 'selected' : ''}>อ่านอิสระสำหรับวิจัย</option></select></label></div>
-        ${notice ? `<div class="notice" role="status">${escape(notice)}</div>` : ''}
-        ${r && screen > 0 ? `<div class="case-strip"><div><span class="meta-label">รหัสเคสสมมติ</span><strong>${escape(currentCase.id)}</strong></div><div><span class="meta-label">ECG ที่กำลังเปิด</span><strong>ครั้งที่ ${r.number} <span class="muted">เวลา ${time(r.capturedAt)}</span></strong></div><div><span class="meta-label">สถานะปรึกษา</span><strong class="small-status">${consultationText(r)}</strong></div></div>` : ''}
-        ${content}
-        <footer class="page-footer"><span>ต้นแบบเพื่อทบทวน workflow • ไม่ใช่อุปกรณ์วินิจฉัย</span><span>ECG Bridge / 0.1</span></footer>
-      </main>
-    </div>
-  </div>`;
+  return `<div class="app-shell ${sharedId ? 'shared-view' : ''}"><header class="app-header"><a href="/" class="brand" ${sharedId ? 'tabindex="-1"' : 'data-action="upload"'}><span class="brand-symbol">${icon('pulse')}</span><span>ECG Bridge<small>Computer Center</small></span></a>${!sharedId ? `<nav aria-label="หน้าหลัก"><button ${processing ? 'disabled' : ''} data-action="upload" class="nav-link ${view === 'upload' ? 'active' : ''}" ${view === 'upload' ? 'aria-current="page"' : ''}>อัปโหลด ECG</button><button ${processing ? 'disabled' : ''} data-action="history" class="nav-link ${view === 'history' ? 'active' : ''}" ${view === 'history' ? 'aria-current="page"' : ''}>ประวัติการตรวจ</button></nav>` : '<span class="read-only-label">รายงานสำหรับอ่านเท่านั้น</span>'}</header><div class="demo-strip"><span class="demo-dot"></span>เวอร์ชันสาธิต · ใช้ข้อมูลสมมติเท่านั้น · ผล AI ยังเป็นผลจำลอง</div><main id="main" tabindex="-1">${error ? `<div class="message error" role="alert">${escape(error)}</div>` : ''}${notice ? `<div class="message success" role="status">${escape(notice)}</div>` : ''}${content}</main><footer class="app-footer">ECG Bridge <span>รับ ECG · ประเมิน · ส่งต่อรายงาน</span></footer></div>`;
 }
 
-function intakeScreen() {
-  const options = Object.entries(scenarios).map(([value, item]) => `<label class="scenario-option"><input type="radio" name="scenario" value="${value}" ${intake.scenario === value ? 'checked' : ''}><span><strong>${item.name}</strong><small>${value === 'unreadable' ? 'ทดสอบทางออกเมื่อ AI ใช้งานไม่ได้' : 'กำหนดผลลัพธ์จำลองสำหรับเดินเรื่อง'}</small></span></label>`).join('');
-  const resume = currentCase ? `<section class="panel resume-panel"><div><span class="meta-label">เคสที่กำลังทำอยู่</span><h2>${escape(currentCase.id)}</h2><p>มี ECG ${currentCase.records.length} ชุด ข้อมูลยังอยู่ กดกลับไปทำต่อได้</p></div>${button('กลับไปเคสปัจจุบัน', 'resume', 'primary')}</section>` : '';
-  return `${resume}<div class="intake-layout"><section class="panel">${currentCase ? '<details class="new-case-details"><summary>เริ่มเคสใหม่แยกจากเคสปัจจุบัน</summary>' : ''}<div class="panel-heading"><h2>ข้อมูลสำหรับเริ่มเคส</h2><span class="badge subtle">ข้อมูลสมมติ</span></div><form id="intake-form"><div class="field"><label for="case-id">รหัสเคส</label><div class="case-id-controls"><input id="case-id" name="caseId" value="${escape(intake.caseId)}" maxlength="29" pattern="DEMO-[A-Z0-9-]{1,24}" required aria-describedby="case-help"><button type="button" class="btn secondary" data-action="generate-id"><span aria-hidden="true">↻</span> สร้างรหัสใหม่</button></div><small id="case-help">สร้างรหัสให้อัตโนมัติแล้ว กดสร้างใหม่ได้ในคลิกเดียว ไม่ใช้ข้อมูลผู้ป่วยจริง</small></div><div class="field"><div class="symptom-heading"><label for="symptoms">อาการและบริบทสั้น ๆ</label><button id="dictate" type="button" class="btn secondary mic-button" data-action="dictate" aria-pressed="false" aria-describedby="speech-status">${microphoneIcon}พูดอาการ</button></div><textarea id="symptoms" name="symptoms" rows="3" maxlength="400" placeholder="พิมพ์เอง หรือกดไมค์แล้วพูดอาการสมมติเป็นภาษาไทย">${escape(intake.symptoms)}</textarea><small id="speech-status" role="status" aria-live="polite">${escape(speechMessage)}</small><span id="speech-preview" class="speech-preview"></span><small>ตรวจข้อความก่อนใช้ • บริการของ browser อาจส่งเสียงไปประมวลผลภายนอก ใช้เฉพาะข้อมูลสมมติ</small></div><fieldset class="scenario-fieldset"><legend>เลือกสถานการณ์สาธิต</legend><div class="scenario-grid">${options}</div></fieldset><button class="btn primary wide" type="submit">${currentCase ? 'เริ่มเคสสาธิตใหม่' : 'ใช้ ECG สังเคราะห์และเริ่มเคส'}</button>${currentCase ? '<p class="hint">ใช้เมื่อเริ่มผู้ป่วยสมมติคนใหม่เท่านั้น ประวัติเคสเดิมจะถูกล้างหลังยืนยัน</p>' : ''}</form>${currentCase ? '</details>' : ''}</section>
-    <aside class="intake-aside"><div class="intro-visual"><span class="intro-icon" aria-hidden="true">↯</span><h2>อ่านได้เร็วขึ้น<br>ปรึกษาได้ต่อเนื่อง</h2><p>ส่ง ECG ให้แพทย์ได้ทันที<br>ให้ AI ประเมินควบคู่กัน</p><div class="mini-flow"><span>รับ ECG</span><span>AI + แพทย์</span><span>คำตอบ</span></div></div><section class="panel import-panel"><h3>มีไฟล์ตัวอย่างของโปรเจกต์?</h3><p>รับเฉพาะ JSON สังเคราะห์ตามตัวอย่าง ไม่อ่านไฟล์ ECG ของผู้ป่วยจริง</p><label class="file-button">เลือก JSON ตัวอย่าง<input id="fixture" type="file" accept=".json,application/json"></label><a class="text-link" href="examples/synthetic-ecg.json" download>ดาวน์โหลดไฟล์ตัวอย่าง</a></section></aside></div>`;
+function historyRows(items, compact = false) {
+  if (!items.length) return `<div class="empty-state">${icon('file')}<h3>${search ? 'ไม่พบรายงานที่ค้นหา' : 'ยังไม่มีประวัติการตรวจ'}</h3><p>${search ? 'ลองค้นหาด้วยรหัสรายงานหรือรหัสอ้างอิงอื่น' : 'รายงานจะถูกบันทึกที่นี่ทันทีหลังประมวลผล'}</p></div>`;
+  return `<div class="history-list ${compact ? 'compact' : ''}">${items.map(item => `<button class="history-row" data-report="${escape(item.id)}"><span class="source-icon">${icon(item.input.kind === 'image' ? 'image' : 'file')}</span><span class="history-main"><strong>${escape(item.reference)}</strong><span>${escape(item.patientCode || item.input.name)}</span></span><span class="history-meta"><time>${timeLabel(item.createdAt)}</time><span class="history-status ${item.status === 'failed' ? 'warning' : ''}">${item.status === 'failed' ? 'ไม่มีผล AI' : 'รายงานพร้อม'}</span></span></button>`).join('')}</div>`;
 }
 
-function waveform(r) {
-  return `<section class="wave-panel"><div class="wave-heading"><div><h2>ECG 12 leads</h2><p>ครั้งที่ ${r.number} · ${date(r.capturedAt)} · ${time(r.capturedAt)} · เครื่องสาธิต</p></div>${button('ขยาย ECG', 'expand', 'secondary')}</div><div class="wave-scroll">${ecgSvg(r)}</div><div class="wave-caption"><span>คลื่นสังเคราะห์เพื่อแสดงหน้าจอ ไม่ใช่ตัวอย่างลักษณะโรค</span><span>ไม่มีสเกลทางคลินิก</span></div></section>`;
+function uploadView() {
+  if (processing) return `<section class="processing-panel" role="status"><div class="processing-icon">${icon('pulse')}</div><h1>กำลังจัดทำรายงาน ECG</h1><p>รับไฟล์แล้ว กำลังเรียก AI จำลองและบันทึกผล</p><div class="processing-files">${files.map(file => `<span>${icon('file')}${escape(file.name)}</span>`).join('')}</div><p class="muted">กรุณารอสักครู่ รายงานจะเปิดให้อัตโนมัติเมื่อบันทึกสำเร็จ</p></section>`;
+  return `<div class="page-title"><div><h1>ตรวจ ECG</h1><p>อัปโหลดไฟล์ แล้วรับรายงานที่พร้อมส่งต่อให้แพทย์</p></div></div><div class="upload-layout"><section class="upload-panel"><form id="upload-form"><h2>อัปโหลด ECG</h2><div class="input-kind" role="group" aria-label="ประเภทไฟล์"><button type="button" data-kind="image" class="kind-option ${kind === 'image' ? 'selected' : ''}" aria-pressed="${kind === 'image'}">${icon('image')}<span>รูปภาพ ECG<small>PNG / JPEG</small></span></button><button type="button" data-kind="wfdb" class="kind-option ${kind === 'wfdb' ? 'selected' : ''}" aria-pressed="${kind === 'wfdb'}">${icon('pulse')}<span>ข้อมูล WFDB<small>.hea + .dat</small></span></button></div><label class="drop-zone ${files.length ? 'has-files' : ''}" id="drop-zone">${icon('upload')}<strong>${files.length ? 'เลือกไฟล์ใหม่' : kind === 'wfdb' ? 'เลือกไฟล์ .hea และ .dat พร้อมกัน' : 'เลือกหรือลากรูป ECG มาวางที่นี่'}</strong><span>${kind === 'wfdb' ? 'ต้องเป็นคู่ไฟล์จาก ECG ระเบียนเดียวกัน' : 'รองรับ PNG และ JPEG'} · รวมไม่เกิน 5 MB</span><input class="sr-only" id="ecg-files" type="file" ${kind === 'wfdb' ? 'multiple accept=".hea,.dat"' : 'accept="image/png,image/jpeg"'} aria-label="${kind === 'wfdb' ? 'เลือกไฟล์ WFDB .hea และ .dat' : 'เลือกภาพ ECG PNG หรือ JPEG'}"></label>${files.length ? `<div class="selected-files">${files.map(file => `<div>${icon('file')}<span>${escape(file.name)}<small>${sizeLabel(file.size)}</small></span></div>`).join('')}<button type="button" class="text-button" data-action="clear-files">นำไฟล์ออก</button></div>` : ''}<div class="sample-row"><button type="button" class="text-button" data-action="sample">ลองด้วย WFDB ตัวอย่าง</button><span>ข้อมูลสังเคราะห์</span></div><div class="form-details"><label class="field" for="patient-code">รหัสอ้างอิงผู้ป่วย / งาน <span>ไม่บังคับ</span></label><input id="patient-code" maxlength="40" value="${escape(patientCode)}" placeholder="เช่น EMS-001 · ไม่ใส่ชื่อผู้ป่วยจริง"><label class="field" for="notes">บันทึกประกอบ <span>ไม่บังคับ</span></label><textarea id="notes" maxlength="400" rows="3" placeholder="บริบทสั้น ๆ ที่ต้องการแนบให้แพทย์">${escape(notes)}</textarea></div><div class="submit-area"><button class="button primary" type="submit" ${!files.length ? 'disabled' : ''}>${icon('pulse')}ประมวลผลและเปิดรายงาน</button><p>บันทึกเข้าประวัติอัตโนมัติ ไม่ต้องกดบันทึกซ้ำ</p></div></form></section><aside class="recent-panel"><div class="section-heading"><h2>ตรวจล่าสุด</h2><button class="text-button" data-action="history">ดูทั้งหมด</button></div>${historyError ? `<p class="inline-error">${escape(historyError)}</p><button class="text-button" data-action="reload-history">ลองโหลดประวัติอีกครั้ง</button>` : !historyLoaded ? '<p class="loading-note">กำลังโหลดประวัติ…</p>' : historyRows(history.slice(0, 5), true)}<div class="workflow-note"><h3>รายงานพร้อมส่งต่อ</h3><p>หลังตรวจเสร็จ เปิดรายงานแล้วกด Copy Link เพื่อนำไปส่งใน LINE ได้</p></div></aside></div>`;
 }
 
-function history(r) {
-  return `<section class="panel history"><div class="panel-heading"><h2>ECG ในเคสนี้</h2><span class="badge subtle">${currentCase.records.length} ชุด</span></div><div class="record-list">${currentCase.records.map(item => `<button class="record-item ${item.id === r.id ? 'selected' : ''}" data-record="${escape(item.id)}" ${item.id === r.id ? 'aria-current="true"' : ''}><span class="record-dot"></span><span><strong>ECG ครั้งที่ ${item.number}</strong><small>${time(item.capturedAt)}${item.number === currentCase.records.length ? ' • ล่าสุด' : ''}</small></span><span class="record-state">${item.review ? 'รีวิวแล้ว' : item.consultation === 'sent' ? 'รอรีวิว' : item.consultation === 'queued' ? 'ส่งไม่สำเร็จ' : 'ยังไม่ส่ง'}</span></button>`).join('')}</div>${screen !== 3 ? `<label class="field compact">สถานการณ์ ECG ครั้งใหม่<select id="next-scenario">${Object.entries(scenarios).map(([value, item]) => `<option value="${value}">${item.name}</option>`).join('')}</select></label>${button('เพิ่ม ECG ครั้งใหม่', 'new-record', 'secondary wide')}` : ''}</section>`;
+function historyView() {
+  const filtered = history.filter(item => `${item.reference} ${item.patientCode} ${item.input.name}`.toLowerCase().includes(search.toLowerCase()));
+  return `<div class="page-title"><div><h1>ประวัติการตรวจ</h1><p>รายงานที่บันทึกไว้ เปิดดูย้อนหลังหรือคัดลอกลิงก์ได้</p></div><button class="button primary" data-action="upload">${icon('upload')}ตรวจ ECG ใหม่</button></div><section class="history-panel"><div class="history-toolbar"><label class="search-field">${icon('search')}<input id="search" type="search" placeholder="ค้นหารหัสรายงาน รหัสอ้างอิง หรือชื่อไฟล์" value="${escape(search)}" aria-label="ค้นหาประวัติการตรวจ"></label><span class="count-label">${filtered.length} รายการ</span></div>${historyError ? `<p class="inline-error">${escape(historyError)}</p><button class="text-button" data-action="reload-history">ลองโหลดอีกครั้ง</button>` : !historyLoaded ? '<p class="loading-note">กำลังโหลดประวัติ…</p>' : historyRows(filtered)}</section>`;
 }
 
-function consult(r) {
-  const sent = r.consultation === 'sent';
-  if (sent) return `<section class="panel sent-summary"><h2>ส่งปรึกษาแล้ว</h2><p>${consultationText(r)}</p><p class="hint">ไม่มีการส่งซ้ำ ดูคำตอบในช่องความเห็นแพทย์ด้านบน</p></section>`;
-  return `<section class="panel consultation-panel"><div class="panel-heading"><h2>ส่งให้แพทย์ ER</h2><span class="badge ${sent ? 'subtle' : 'pending'}">${sent ? 'ส่งจำลองแล้ว' : 'รอส่ง'}</span></div><p>ส่ง ECG และบริบทที่แสดงบนหน้านี้ได้ทันที แม้ AI ยังไม่เสร็จ</p><label class="confirm-label"><input id="confirm-record" type="checkbox" ${r.confirmed ? 'checked' : ''} ${sent ? 'disabled' : ''}><span>ยืนยันว่าเป็นเคส <strong>${escape(currentCase.id)}</strong><br>ECG ครั้งที่ ${r.number} เวลา ${time(r.capturedAt)}</span></label>${r.consultation === 'queued' ? '<p class="callout warning">ยังส่งไม่สำเร็จ เปิดเครือข่ายจำลองแล้วกดส่งอีกครั้ง ระหว่างนี้ใช้ช่องทางปรึกษาเดิม</p>' : ''}<div class="action-row">${button(r.consultation === 'queued' ? 'จำลองส่งอีกครั้ง' : 'จำลองส่งปรึกษา', 'send', 'primary', sent || !r.confirmed)}${sent ? button('เปิดมุมมองแพทย์', 'doctor', 'secondary') : ''}</div><p class="hint">ไม่มีการแจ้งเตือนหรือส่งข้อมูลถึงแพทย์จริง</p></section>`;
+function sourcePreview() {
+  const source = report.input, image = source.kind === 'image' ? source.files?.[0] : null;
+  return `<section class="source-panel"><div class="section-heading"><h2>ECG ต้นฉบับ</h2><span>${sizeLabel(source.size)}</span></div>${image ? `<img class="source-image" src="data:${escape(image.mime)};base64,${escape(image.base64)}" alt="ภาพ ECG ที่อัปโหลด">` : `<div class="wfdb-source">${icon('pulse')}<div><strong>ไฟล์สัญญาณ WFDB</strong><p>เก็บไฟล์ .hea และ .dat ต้นฉบับไว้กับรายงาน ไม่มีการถอดรหัส waveform หรือวัดคุณภาพทางคลินิกในเดโม</p></div></div>`}<div class="source-files">${(source.files || []).map((file, i) => `<button class="text-button" data-source="${i}">${icon('file')}${escape(file.name)} · ดาวน์โหลด</button>`).join('')}</div></section>`;
 }
 
-function aiPanel(r, role = 'field') {
-  if (!aiVisible(r, mode, role)) return `<section class="panel ai-panel"><div class="panel-heading"><h2>ผล AI</h2><span class="badge subtle">ซ่อนผล</span></div><div class="hidden-ai"><span aria-hidden="true">▣</span><h3>อ่าน ECG อย่างอิสระก่อน</h3><p>ผล AI จะแสดงหลังบันทึกความเห็นแพทย์ เพื่อสาธิตการลดการชี้นำในการศึกษา</p></div></section>`;
-  const pending = r.analysis.status === 'pending';
-  const item = scenarios[r.analysis.result ?? r.scenario];
-  return `<section class="panel ai-panel"><div class="panel-heading"><h2>ผลประเมินจาก AI</h2><span class="badge ${pending ? 'pending' : 'subtle'}">${pending ? 'รอผลจำลอง' : 'ผลจำลอง'}</span></div>${pending ? `<div class="pending-result"><div class="signal-mark" aria-hidden="true">∿</div><h3>ยังไม่มีผล AI</h3><p>AI จำลองจะตอบอัตโนมัติภายในประมาณ 2 วินาที ส่งปรึกษาได้โดยไม่ต้องรอ</p></div>` : `<div class="result-block ${item.variant}"><span class="result-icon" aria-hidden="true">${r.analysis.status === 'failed' ? '!' : '∿'}</span><div><h3>${item.label}</h3><p>${item.description}</p></div></div><p class="hint">ผลของ ECG ครั้งที่ ${r.number} เวลา ${time(r.capturedAt)} เท่านั้น • ไม่มีคะแนนความมั่นใจทางคลินิก</p>`}<details class="demo-tools"><summary>เครื่องมือผู้สาธิต / JSON API</summary>${pending ? button('จำลองให้ AI ประเมินเสร็จ', 'finish-ai', 'secondary') : ''}${button('ดู JSON สำหรับ API', 'api-json', 'secondary')}</details></section>`;
-}
-
-function physicianPanel(r) {
-  return `<section class="panel physician-panel"><div class="panel-heading"><h2>ความเห็นแพทย์</h2><span class="badge ${r.review ? 'subtle' : 'pending'}">${r.review ? 'บันทึกแล้ว' : 'ยังไม่รีวิว'}</span></div>${r.review ? `<div class="review-content"><p class="meta-label">${escape(r.review.author)} · ${time(r.review.at)}</p><h3>${escape(r.review.opinion)}</h3><p class="preserve-lines">${escape(r.review.advice)}</p><p class="hint">ความเห็นและคำตอบสมมติ ไม่ใช่คำสั่งรักษา</p></div>` : `<p>ยังไม่มีความเห็นแพทย์สำหรับ ECG ชุดนี้ ผล AI ไม่เปลี่ยนสถานะนี้</p>${button('สลับเป็นแพทย์เพื่อตอบเคสนี้ (สาธิต)', 'doctor', 'secondary', r.consultation !== 'sent')}`}</section>`;
-}
-
-function reviewScreen(r) {
-  const draft = drafts.get(r.id) ?? { opinion: '', advice: '' };
-  return `${mode === 'research' ? '<div class="research-note">โหมดอ่านอิสระ: ซ่อนผล AI ในหน้านี้จนส่งความเห็น • เป็นการจำลอง UI ไม่ใช่ระบบควบคุมสิทธิ์งานวิจัย</div>' : ''}
-    ${waveform(r)}<div class="content-grid"><div><section class="panel"><div class="panel-heading"><h2>บริบทผู้ป่วยสมมติ</h2></div><p class="preserve-lines">${escape(currentCase.symptoms || 'ไม่ได้ระบุอาการ')}</p></section>${r.review ? physicianPanel(r) : `<section class="panel"><div class="panel-heading"><h2>บันทึกผลอ่านของแพทย์ ER</h2><span class="badge subtle">บทบาทสมมติ</span></div>${r.consultation !== 'sent' ? `<p class="callout warning">${r.consultation === 'queued' ? 'เคสนี้ยังส่งไม่สำเร็จ' : 'เคสนี้ยังไม่ได้ส่งปรึกษา'} กลับไปส่งจากมุมมองทีมหน้างานก่อน</p>${button('กลับไปตรวจและส่งปรึกษา', 'verify', 'secondary')}` : `<form id="review-form"><label class="field">ความเห็นจากการอ่าน ECG<select id="opinion" required><option value="">เลือกความเห็น</option>${['สงสัย STEMI', 'สงสัย NSTE-ACS ต้องประเมินเพิ่มเติม', 'ยังไม่พบลักษณะที่ชัดเจนจาก ECG', 'ECG คุณภาพไม่พอ ต้องบันทึกใหม่', ...(mode === 'assist' ? ['เห็นต่างจากผล AI'] : [])].map(value => `<option ${draft.opinion === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label><label class="field">คำตอบกลับทีมหน้างาน<textarea id="advice" maxlength="800" rows="4" placeholder="กรอกคำตอบสมมติเพื่อทดสอบการสื่อสาร ไม่ใส่คำสั่งรักษาจริง" required>${escape(draft.advice)}</textarea></label><p class="hint">บันทึกแยกจาก AI โดยไม่แก้ผล AI เดิม แพทย์หัวใจและ fast track ยังอยู่นอกต้นแบบ</p><button class="btn primary" type="submit">บันทึกและจำลองส่งคำตอบ</button></form>`}</section>`}${aiPanel(r, 'doctor')}</div><aside>${history(r)}<section class="panel"><h3>วิธีเดินต้นแบบ</h3><p>คุณกำลังสลับมาเล่นบทบาทแพทย์ ไม่มีผู้รับเคสจริง และยังไม่มีระบบล็อกอิน</p>${button('กลับมุมมองทีมหน้างาน', 'results', 'secondary wide')}</section></aside></div>`;
-}
-
-function resultScreen(r) {
-  return `<div class="content-grid"><div><div class="result-columns">${aiPanel(r)}${physicianPanel(r)}</div>${waveform(r)}${consult(r)}<section class="panel"><div class="panel-heading"><h2>เหตุการณ์ของ ECG ชุดนี้</h2></div><ol class="timeline">${r.events.map(item => `<li><time>${time(item.at)}</time><span>${escape(item.text)}</span></li>`).join('')}</ol></section></div><aside>${history(r)}</aside></div>`;
-}
-
-function verifyScreen(r) {
-  return `${waveform(r)}<div class="content-grid"><div><section class="panel"><div class="panel-heading"><h2>ตรวจข้อมูลก่อนส่ง</h2><span class="badge subtle">ไฟล์สาธิตรองรับ</span></div><dl class="details"><div><dt>รหัสเคส</dt><dd>${escape(currentCase.id)}</dd></div><div><dt>ข้อมูลต้นทาง</dt><dd>คลื่นสังเคราะห์ 12 leads สำหรับต้นแบบ</dd></div><div><dt>เวลารับ ECG</dt><dd>${date(r.capturedAt)} ${time(r.capturedAt)}</dd></div><div><dt>อาการ</dt><dd>${escape(currentCase.symptoms || 'ไม่ได้ระบุ')}</dd></div></dl><p class="callout">ต้นแบบนี้ยังไม่ประเมินคุณภาพทางคลินิก ไม่อ่าน XML/PDF/รูปถ่ายจริง และไม่เชื่อมเครื่อง ECG</p></section>${consult(r)}<div class="next-link">${button('ดูผลประเมินและสถานะ', 'results', 'secondary')}</div></div><aside>${aiPanel(r)}${history(r)}</aside></div>`;
+function reportView() {
+  if (loading) return '<section class="loading-panel" role="status"><h1>กำลังเปิดรายงาน…</h1></section>';
+  if (!report) return '<section class="loading-panel"><h1>ไม่พบรายงาน</h1><p>ตรวจสอบลิงก์หรือติดต่อเจ้าหน้าที่ที่ส่งรายงาน</p></section>';
+  const url = reportUrl(report.id, location.origin);
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+  return `<div class="report-toolbar">${!sharedId ? `<button class="text-button back-link" data-action="history">${icon('arrow')}ประวัติการตรวจ</button>` : '<span>ลิงก์รายงานแบบอ่านอย่างเดียว</span>'}<div class="report-actions"><button class="button secondary" data-action="print">${icon('print')}พิมพ์รายงาน</button><button class="button primary" data-action="copy">${icon('copy')}Copy Link</button></div></div>${copyFallback ? `<div class="copy-fallback"><label for="report-link">คัดลอกลิงก์รายงานนี้</label><input id="report-link" readonly value="${escape(url)}"><small>กด Ctrl+C หรือแตะค้างเพื่อคัดลอก</small></div>` : ''}${local ? '<p class="local-link-note">ลิงก์เดโมเปิดได้บนเครื่องนี้เท่านั้น การส่งให้หมอเปิดจากอีกเครื่องต้องนำระบบขึ้น server ที่เข้าถึงร่วมกันก่อน</p>' : ''}${reportMarkup(report)}${sourcePreview()}`;
 }
 
 function render() {
-  const previous = document.activeElement;
-  const focusId = ['INPUT', 'TEXTAREA', 'SELECT'].includes(previous?.tagName) ? previous.id : null;
-  const selection = previous?.tagName === 'TEXTAREA' ? [previous.selectionStart, previous.selectionEnd] : null;
-  const r = record();
-  if (!r && screen > 0) screen = 0;
-  app.innerHTML = shell(screen === 0 ? intakeScreen() : screen === 1 ? verifyScreen(r) : screen === 2 ? resultScreen(r) : reviewScreen(r));
-  if (screen === 0) updateSpeechControls();
-  const restored = focusId ? document.getElementById(focusId) : null;
-  if (restored && !restored.disabled) { restored.focus(); if (selection) restored.setSelectionRange(...selection); }
-}
-function announce(message) { notice = message; document.querySelector('#announcement').textContent = message; }
-function queueAnalysis(c, r) {
-  setTimeout(() => {
-    completeAnalysis(c, r.id);
-    if (currentCase === c) { render(); document.querySelector('#announcement').textContent = 'AI จำลองตอบแล้วสำหรับ ECG ครั้งที่ ' + r.number; }
-  }, 2000);
+  const focusedId = document.activeElement?.id, caret = ['search', 'patient-code', 'notes'].includes(focusedId) ? document.activeElement.selectionStart : null;
+  app.innerHTML = shell(view === 'upload' ? uploadView() : view === 'history' ? historyView() : reportView());
+  if (['search', 'patient-code', 'notes'].includes(focusedId)) { const field = document.getElementById(focusedId); if (field) { field.focus(); if (caret != null) field.setSelectionRange(caret, caret); } }
 }
 function navigate(next) {
-  dictation.cancel();
-  screen = next;
-  notice = '';
-  render();
-  document.querySelector('#main').focus();
-  window.scrollTo(0, 0);
+  if (processing) return;
+  reportSequence++; view = next; error = ''; notice = ''; loading = false; copyFallback = false;
+  render(); document.querySelector('#main').focus(); window.scrollTo(0, 0);
 }
-function begin(data) {
-  if (currentCase && data.caseId === currentCase.id) throw new Error('เคสใหม่ต้องใช้รหัสใหม่ กดสร้างรหัสใหม่ก่อนเริ่ม');
-  if (currentCase && !window.confirm('เริ่มเคสใหม่จะล้างประวัติเคสสาธิตปัจจุบัน ต้องการเริ่มใหม่หรือไม่?')) return;
-  dictation.cancel();
-  currentCase = createCase(data.caseId, data.symptoms);
-  const added = addRecord(currentCase, data.scenario);
-  selectedId = added.id;
-  queueAnalysis(currentCase, added);
-  drafts.clear();
-  intake = { caseId: generateDemoCaseId(), symptoms: '', scenario: 'stemi' };
-  navigate(1);
+async function loadHistory() {
+  try { history = await api('/api/reports'); historyError = ''; historyLoaded = true; } catch (err) { historyError = err.message; }
+  if (!sharedId && !processing) render();
+}
+async function openReport(id) {
+  const sequence = ++reportSequence;
+  view = 'report'; loading = true; error = ''; notice = ''; copyFallback = false; report = null; render();
+  try { const loaded = await api(`/api/reports/${encodeURIComponent(id)}`); if (sequence !== reportSequence) return; report = loaded; }
+  catch (err) { if (sequence !== reportSequence) return; error = err.message; }
+  loading = false; render(); document.querySelector('#main').focus(); window.scrollTo(0, 0);
+}
+function selectFiles(selected) {
+  const next = Array.from(selected);
+  if (!next.length) return;
+  if (next.reduce((sum, file) => sum + file.size, 0) > 5 * 1024 * 1024) throw new Error('ไฟล์รวมต้องไม่เกิน 5 MB กรุณาเลือกไฟล์ใหม่');
+  if (kind === 'image' && (next.length !== 1 || !['image/png', 'image/jpeg'].includes(next[0].type))) throw new Error('เลือกรูป PNG หรือ JPEG หนึ่งไฟล์');
+  if (kind === 'wfdb' && (next.length !== 2 || next.filter(file => /\.hea$/i.test(file.name)).length !== 1 || next.filter(file => /\.dat$/i.test(file.name)).length !== 1)) throw new Error('เลือกคู่ไฟล์ .hea และ .dat ของ ECG เดียวกันพร้อมกัน');
+  files = next; error = ''; render();
+}
+function encodeFile(file) {
+  return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error(`อ่านไฟล์ ${file.name} ไม่ได้ กรุณาเลือกใหม่`)); reader.onload = () => resolve({ name: file.name, mime: file.type || 'application/octet-stream', base64: String(reader.result).split(',')[1] }); reader.readAsDataURL(file); });
+}
+async function submit() {
+  if (processing || !files.length) return;
+  processing = true; error = ''; notice = ''; render();
+  try {
+    const encoded = await Promise.all(files.map(encodeFile));
+    const saved = await api('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientCode, notes, input: { kind, files: encoded } }) });
+    reportSequence++; report = saved; view = 'report'; files = []; patientCode = ''; notes = ''; copyFallback = false;
+    notice = 'รายงานพร้อมแล้ว และบันทึกเข้าประวัติเรียบร้อย'; void loadHistory();
+  } catch (err) { error = `${err.message} ไฟล์ที่เลือกยังอยู่ คุณสามารถลองใหม่ได้`; }
+  processing = false; render(); document.querySelector('#main').focus(); window.scrollTo(0, 0);
 }
 
-app.addEventListener('input', e => {
-  if (e.target.id === 'case-id') intake.caseId = e.target.value;
-  if (e.target.id === 'symptoms') intake.symptoms = e.target.value;
-  if (['opinion', 'advice'].includes(e.target.id)) {
-    const draft = drafts.get(selectedId) ?? { opinion: '', advice: '' };
-    draft[e.target.id] = e.target.value;
-    drafts.set(selectedId, draft);
-  }
+app.addEventListener('input', event => {
+  if (event.target.id === 'patient-code') patientCode = event.target.value;
+  if (event.target.id === 'notes') notes = event.target.value;
+  if (event.target.id === 'search') { search = event.target.value; render(); }
 });
-app.addEventListener('change', async e => {
+app.addEventListener('change', event => { if (event.target.id === 'ecg-files' && !processing) { try { selectFiles(event.target.files); } catch (err) { error = err.message; render(); } } });
+app.addEventListener('dragover', event => { if (event.target.closest('#drop-zone')) event.preventDefault(); });
+app.addEventListener('drop', event => { if (!event.target.closest('#drop-zone') || processing) return; event.preventDefault(); try { selectFiles(event.dataTransfer.files); } catch (err) { error = err.message; render(); } });
+app.addEventListener('submit', event => { if (event.target.id === 'upload-form') { event.preventDefault(); void submit(); } });
+app.addEventListener('click', async event => {
+  const control = event.target.closest('button, a[data-action]');
+  if (!control) return;
+  if (control.dataset.action) event.preventDefault();
+  if (processing) return;
   try {
-    if (e.target.name === 'scenario') intake.scenario = e.target.value;
-    if (e.target.id === 'confirm-record') { confirmRecord(record(), e.target.checked); render(); document.querySelector('#confirm-record').focus(); }
-    if (e.target.id === 'online') { online = e.target.checked; announce(online ? 'เครือข่ายจำลองพร้อมแล้ว เคสที่ค้างต้องกดส่งอีกครั้ง' : 'ปิดเครือข่ายจำลองแล้ว'); render(); document.querySelector('#online').focus(); }
-    if (e.target.id === 'mode' && !currentCase) { mode = e.target.value; announce(mode === 'research' ? 'โหมดอ่านอิสระซ่อนผล AI ทุกหน้าจนบันทึกความเห็น เลือกโหมดได้ก่อนเริ่มเคส' : 'โหมด AI ช่วยอ่านแสดงผล AI ให้แพทย์เห็นได้'); render(); document.querySelector('#mode').focus(); }
-    if (e.target.id === 'fixture') {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (file.size > 8192) throw new Error('ไฟล์ตัวอย่างต้องไม่เกิน 8 KB');
-      begin(parseFixture(await file.text()));
+    if (control.dataset.report) { await openReport(control.dataset.report); return; }
+    if (control.dataset.kind) { kind = control.dataset.kind; files = []; error = ''; render(); return; }
+    if (control.dataset.source !== undefined && report) { const source = report.input.files[Number(control.dataset.source)]; const link = document.createElement('a'); link.href = `data:${source.mime};base64,${source.base64}`; link.download = source.name; link.click(); return; }
+    const action = control.dataset.action;
+    if (action === 'upload' || action === 'history') { navigate(action); if (action === 'history') void loadHistory(); }
+    if (action === 'reload-history') void loadHistory();
+    if (action === 'clear-files') { files = []; error = ''; render(); }
+    if (action === 'print') window.print();
+    if (action === 'copy' && report) {
+      try { await navigator.clipboard.writeText(reportUrl(report.id, location.origin)); notice = 'คัดลอกลิงก์แล้ว นำไปวางใน LINE ได้'; } catch { copyFallback = true; notice = 'เลือกและคัดลอกลิงก์ด้านล่างได้เลย'; }
+      render(); const field = document.querySelector('#report-link'); field?.focus(); field?.select();
     }
-  } catch (error) { announce(error.message); render(); }
-});
-app.addEventListener('submit', e => {
-  e.preventDefault();
-  try {
-    if (e.target.id === 'intake-form') {
-      if (dictation.active) { announce('กดหยุดพูดและตรวจข้อความก่อนเริ่มเคส'); render(); return; }
-      begin(intake);
+    if (action === 'sample') {
+      const initialFiles = files, initialKind = kind;
+      const samples = await Promise.all(['ecg-demo.hea', 'ecg-demo.dat'].map(async name => { const response = await fetch(`/examples/${name}`); if (!response.ok) throw new Error('โหลดไฟล์ตัวอย่างไม่ได้ ลองใหม่อีกครั้ง'); return new File([await response.blob()], name, { type: 'application/octet-stream' }); }));
+      if (view !== 'upload' || processing || files !== initialFiles || kind !== initialKind) return;
+      kind = 'wfdb'; selectFiles(samples);
     }
-    if (e.target.id === 'review-form') {
-      reviewRecord(record(), document.querySelector('#opinion').value, document.querySelector('#advice').value, mode);
-      navigate(2);
-      announce('แพทย์สมมติตอบกลับแล้ว ดูคำตอบในช่องความเห็นแพทย์');
-      render();
-    }
-  } catch (error) { announce(error.message); render(); }
-});
-app.addEventListener('click', e => {
-  const target = e.target.closest('button, a');
-  if (!target) return;
-  try {
-    if (target.dataset.screen !== undefined) { navigate(Number(target.dataset.screen)); return; }
-    if (target.dataset.record) { selectedId = target.dataset.record; notice = ''; render(); return; }
-    const action = target.dataset.action;
-    if (!action) return;
-    e.preventDefault();
-    if (action === 'generate-id') { intake.caseId = generateDemoCaseId(); document.querySelector('#case-id').value = intake.caseId; document.querySelector('#announcement').textContent = 'สร้างรหัสเคสใหม่แล้ว ' + intake.caseId; }
-    if (action === 'dictate') { if (dictation.active) dictation.stop(); else dictation.start(intake.symptoms); }
-    if (action === 'home') navigate(currentCase ? 2 : 0);
-    if (action === 'resume') navigate(record()?.consultation === 'unsent' ? 1 : 2);
-    if (action === 'verify') navigate(1);
-    if (action === 'results') navigate(2);
-    if (action === 'doctor') navigate(3);
-    if (action === 'send') {
-      const r = record();
-      if (r.consultation === 'queued') retryConsultation(r, online); else sendConsultation(r, online);
-      if (r.consultation === 'sent') navigate(2);
-      announce(online ? 'จำลองส่งปรึกษาแล้ว โดยไม่รอผล AI — ยังไม่มีแพทย์รับอ่าน' : 'ยังส่งไม่สำเร็จ เปิดเครือข่ายจำลองแล้วกดส่งอีกครั้ง');
-      render();
-    }
-    if (action === 'finish-ai') { completeAnalysis(currentCase, selectedId); announce('อัปเดตผล AI จำลองสำหรับ ECG ชุดนี้แล้ว'); render(); }
-    if (action === 'new-record') { const added = addRecord(currentCase, document.querySelector('#next-scenario').value); selectedId = added.id; queueAnalysis(currentCase, added); navigate(1); announce('เพิ่ม ECG ชุดใหม่แล้ว ต้องยืนยันเคสอีกครั้ง ผลเก่ายังคงอยู่ใน ECG ชุดเดิม'); render(); }
-    if (action === 'api-json' && aiVisible(record(), mode, screen === 3 ? 'doctor' : 'field')) {
-      const r = record();
-      const request = r.analysis.request;
-      const preview = { ...request, signal: { ...request.signal, samples_mv: '[12 arrays × 1000 samples — download full JSON]' } };
-      const dialog = document.createElement('dialog');
-      dialog.className = 'api-dialog';
-      dialog.innerHTML = `<div class="wave-heading"><h2>Inference API — JSON จำลอง</h2><form method="dialog"><button class="btn secondary">ปิด</button></form></div><div class="api-content"><p>ไม่มี HTTP call จริง • class scores เป็นค่าจำลอง ไม่ใช่ความเสี่ยงทางคลินิก</p><h3>Request (preview)</h3><pre>${escape(JSON.stringify(preview, null, 2))}</pre><h3>Response</h3><pre>${escape(JSON.stringify(r.analysis.response, null, 2))}</pre><button class="btn secondary" id="download-request">ดาวน์โหลด request JSON เต็ม</button></div>`;
-      document.body.append(dialog);
-      dialog.querySelector('#download-request').addEventListener('click', () => {
-        const url = URL.createObjectURL(new Blob([JSON.stringify(request, null, 2)], { type: 'application/json' }));
-        const link = document.createElement('a');
-        link.href = url; link.download = `${r.id}-request.json`; link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      });
-      dialog.addEventListener('close', () => { dialog.remove(); document.querySelector('[data-action="api-json"]')?.focus(); });
-      dialog.showModal();
-    }
-    if (action === 'expand') {
-      const dialog = document.createElement('dialog');
-      dialog.className = 'wave-dialog';
-      dialog.innerHTML = `<div class="wave-heading"><h2>ECG ครั้งที่ ${record().number} — คลื่นสังเคราะห์</h2><form method="dialog"><button class="btn secondary">ปิด</button></form></div><div class="wave-scroll">${ecgSvg(record(), true)}</div><p class="hint">เลื่อนแนวนอนเพื่อดูครบ 12 leads • ไม่ใช่สเกลทางคลินิก</p>`;
-      document.body.append(dialog);
-      dialog.addEventListener('close', () => { dialog.remove(); document.querySelector('[data-action="expand"]')?.focus(); });
-      dialog.showModal();
-    }
-  } catch (error) { announce(error.message); render(); }
+  } catch (err) { error = err.message; render(); }
 });
 
-window.addEventListener('pagehide', () => dictation.cancel());
 render();
+if (sharedId) void openReport(sharedId); else void loadHistory();

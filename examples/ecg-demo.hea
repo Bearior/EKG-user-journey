@@ -1,0 +1,14 @@
+ecg-demo 12 100 1000
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -19426 0 I
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -17866 0 II
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -16366 0 III
+ecg-demo.dat 16 1000(0)/mV 16 0 0 14776 0 aVR
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -13226 0 aVL
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -11726 0 aVF
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -10166 0 V1
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -8586 0 V2
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -7116 0 V3
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -5516 0 V4
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -4036 0 V5
+ecg-demo.dat 16 1000(0)/mV 16 0 0 -2506 0 V6
+# Synthetic ECG generated for UI demonstration only. No patient data.

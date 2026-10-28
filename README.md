@@ -1,132 +1,95 @@
-# ECG Bridge — ต้นแบบ user journey สำหรับ AI-ECG
+# ECG Bridge — Computer Center
 
-เว็บต้นแบบภาษาไทยสำหรับให้แพทย์รีวิวขั้นตอนทีมหน้างาน **เริ่มเคส → ตรวจและส่งปรึกษา → ติดตามผล** พร้อมมุมมองแพทย์สาธิตแยกบทบาท ผล AI และความเห็นแพทย์แสดงแยกกัน ส่งปรึกษาได้โดยไม่ต้องรอ AI และแต่ละ ECG มีผลกับประวัติของตัวเอง
+เว็บสำหรับเจ้าหน้าที่ Computer Center: **อัปโหลด ECG → AI จำลองประเมิน → เปิดรายงานและบันทึกประวัติอัตโนมัติ → Copy Link ส่งต่อใน LINE**
 
-> ข้อมูลผู้ป่วย waveform ผล AI เครือข่าย และคำตอบแพทย์ทั้งหมดเป็นข้อมูลจำลอง ไม่ใช่ระบบวินิจฉัย ไม่มีโมเดลจริง และไม่มีการส่งข้อมูลให้โรงพยาบาลหรือแพทย์จริง
+> เวอร์ชันสาธิต ใช้ข้อมูลสมมติเท่านั้น ผล AI เป็นผลตัวอย่าง ไม่ได้วิเคราะห์ไฟล์ด้วยโมเดลจริง ไม่มีการส่งข้อความ LINE หรือเชื่อม PEMPUS อัตโนมัติ
 
-## เปิดเว็บ / prototype
+## เปิดเว็บ
 
-ต้องมี **Node.js 24 ขึ้นไป** และ browser รุ่นปัจจุบัน เช่น Chrome หรือ Edge ไม่ต้อง `npm install` เพราะไม่มี dependency เพิ่ม
-
-เปิด PowerShell หรือ terminal แล้วรัน:
+ต้องมี Node.js 24 ขึ้นไป ไม่ต้อง npm install เพราะไม่มี dependency เพิ่ม
 
 ```powershell
 cd C:\Bear_Work\EKG-capstone-research\Application
 npm start
 ```
 
-จากนั้นเปิด **http://127.0.0.1:4173** ใน browser และเปิด terminal ค้างไว้ตลอดการสาธิต หยุด server ด้วย `Ctrl+C`
+เปิด **http://127.0.0.1:4173** และเปิด terminal ค้างไว้ หยุดด้วย Ctrl+C
 
-อย่าเปิด `index.html` ด้วยการดับเบิลคลิก เพราะใช้ JavaScript ES modules ซึ่งต้องเปิดผ่าน HTTP server
-
-หาก port 4173 ถูกใช้อยู่ ให้ใช้ port อื่นใน PowerShell:
+หาก port ถูกใช้อยู่:
 
 ```powershell
 $env:PORT = '4174'
 npm start
 ```
 
-แล้วเปิด http://127.0.0.1:4174 Server รับการเชื่อมต่อเฉพาะคอมพิวเตอร์เครื่องนี้ ไม่เปิดให้โทรศัพท์หรือเครื่องอื่นในเครือข่ายเข้าถึง
+เปิด **http://127.0.0.1:4174** แทน ห้ามเปิด index.html ด้วยการดับเบิลคลิก เพราะหน้าเว็บต้องเรียก report API ผ่าน Node server
 
-## วิธีเดินเดโม
+## วิธีใช้งาน
 
-1. หน้า **เริ่มเคส** สร้างรหัส `DEMO-...` ให้อัตโนมัติแล้ว หากต้องการรหัสใหม่กด **สร้างรหัสใหม่** ในคลิกเดียว เลือกสถานการณ์ เช่น สงสัย STEMI แล้วกด **ใช้ ECG สังเคราะห์และเริ่มเคส**
-2. หน้า **ตรวจและส่งปรึกษา** ดูรหัสเคสและเวลา ECG ติ๊กยืนยัน แล้วกด **จำลองส่งปรึกษา** ได้ทันที แม้ AI ยังไม่มีผล
-3. หลังเริ่มเคส AI จำลองตอบอัตโนมัติภายในประมาณ 2 วินาที ไม่ต้องกดให้ AI เสร็จเอง การส่งปรึกษายังทำได้ก่อนผล AI
-4. หน้า **ติดตามผล** ดูผล AI และสถานะความเห็นแพทย์แยกกัน
-5. กด **สลับเป็นแพทย์เพื่อตอบเคสนี้ (สาธิต)** หรือเมนูสลับบทบาทสำหรับผู้สาธิต เลือกความเห็น ใส่คำตอบสมมติ แล้วกด **บันทึกและจำลองส่งคำตอบ**
-6. ระบบกลับหน้า **ติดตามผล** อัตโนมัติเมื่อแพทย์ตอบ แสดงคำตอบและประวัติเหตุการณ์
+1. เลือก **รูปภาพ ECG** (PNG/JPEG หนึ่งไฟล์) หรือ **ข้อมูล WFDB** (.hea และ .dat ของระเบียนเดียวกันสองไฟล์ เลือกพร้อมกัน)
+2. เลือก/ลากไฟล์มาวาง ขนาดรวมไม่เกิน 5 MB หรือกด **ลองด้วย WFDB ตัวอย่าง** ซึ่งใช้ข้อมูลสังเคราะห์ที่แนบมา
+3. ใส่รหัสอ้างอิงและบันทึกประกอบได้ ไม่บังคับ และไม่ใช้ชื่อ/ข้อมูลผู้ป่วยจริง
+4. กด **ประมวลผลและเปิดรายงาน** เมื่อบันทึกสำเร็จจะเปิดรายงานและเพิ่มเข้าประวัติทันที ไม่ต้องกดบันทึกซ้ำ
+5. กด **Copy Link** แล้วนำไปวางใน LINE ด้วยตัวเอง หรือกด **พิมพ์รายงาน** เพื่อใช้ dialog พิมพ์/Save as PDF ของ browser
+6. เปิด **ประวัติการตรวจ** เพื่อค้นหาและเปิดรายงานย้อนหลัง ประวัติยังอยู่หลังรีเฟรชหรือ restart server
 
-### สถานการณ์เพิ่มเติม
+## ลิงก์รายงาน
 
-- **AI วิเคราะห์ไม่ได้:** เลือกสถานการณ์นี้ตอนเริ่มเคส แล้วจำลองให้ AI เสร็จ ยังส่งให้หมออ่านได้
-- **เครือข่ายจำลองขาด:** ปิด checkbox ด้านบนก่อนส่ง จะขึ้นว่ายังส่งไม่สำเร็จ เปิด checkbox แล้วกด **จำลองส่งอีกครั้ง** ไม่ส่งอัตโนมัติ
-- **ECG ใหม่:** เลือกสถานการณ์และกด **เพิ่ม ECG ครั้งใหม่** ต้องยืนยันใหม่ ผล AI/ความเห็นเดิมอยู่กับ ECG ครั้งเดิม เลือกย้อนดูได้จากประวัติ
-- **แพทย์เห็นต่าง:** เลือกความเห็นที่ต่างจากผล AI แล้วบันทึก ระบบเก็บแยกกันโดยไม่เขียนทับผล AI
-- **อ่านอิสระสำหรับวิจัย:** เลือกโหมดอ่านอิสระก่อนเริ่มเคส โหมดจะล็อกหลังเริ่มเคส ผล AI และ JSON response จะถูกซ่อนทุกหน้าจนส่งความเห็นแพทย์ ไม่มีตัวเลือกเปรียบเทียบกับ AI ก่อนอ่านจบ หากต้องการเปลี่ยนโหมดให้รีเฟรชหน้า เป็นเพียงการสาธิต UI ไม่ใช่ระบบปกปิดผลหรือควบคุมสิทธิ์ที่พร้อมใช้ในงานวิจัยจริง
+รายงานมี URL `/reports/<UUID>` เปิดได้ในอีกแท็บหรือ browser บนเครื่องเดียวกัน หน้าลิงก์เป็นหน้ารายงานอ่านอย่างเดียว ไม่มีฟอร์มอัปโหลดหรือสลับบทบาทแพทย์
 
-ใช้ **รีเฟรชหน้า** เพื่อเริ่มใหม่ ข้อมูลอยู่ในหน่วยความจำของหน้าเว็บเท่านั้น ไม่มี localStorage/database และไม่คงอยู่หลังรีเฟรช การเริ่มเคสใหม่จะถามก่อนล้างประวัติเคสสาธิตปัจจุบัน
+**ลิงก์ localhost เปิดจากเครื่องหมอไม่ได้** การส่งให้หมอเปิดจากอีกเครื่องต้อง deploy บน server ที่เข้าถึงร่วมกัน ก่อนใช้ข้อมูลผู้ป่วยจริงต้องมี authentication, สิทธิ์อ่านรายงาน, การควบคุมอายุ/เพิกถอนลิงก์, audit และนโยบายจัดเก็บข้อมูลที่โรงพยาบาลอนุมัติ ปัจจุบัน server bind เฉพาะ 127.0.0.1 และไม่มี authentication อย่าเปิดเผย server นี้ต่ออินเทอร์เน็ตหรือใช้กับข้อมูลผู้ป่วยจริง
 
-### พูดอาการเป็นข้อความภาษาไทย
+Copy Link เป็นการคัดลอกเท่านั้น ไม่ยืนยันว่าได้ส่ง LINE หรือแพทย์ได้อ่านแล้ว
 
-กดปุ่มไมค์ **พูดอาการ** ข้างช่องอาการ อนุญาตไมค์เมื่อ browser ถาม แล้วพูดข้อมูลอาการสมมติเป็นภาษาไทย กด **หยุดพูด** รอข้อความสุดท้าย และตรวจคำก่อนเริ่มเคส ข้อความใหม่จะต่อจากข้อความที่กรอกไว้ ไม่แทนข้อความเดิม ช่องพิมพ์ถูกพักไว้ระหว่างฟังเพื่อป้องกันข้อความชนกัน และพิมพ์แก้ได้หลังหยุด
+## การจัดเก็บและรูปแบบไฟล์
 
-- ใช้ Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`) ของ browser ไม่ต้องติดตั้ง package หรือใส่ API key
-- browser ที่ไม่รองรับจะปิดปุ่มไมค์และให้พิมพ์เองได้ หากไม่มีสิทธิ์ไมค์ ไม่พบอุปกรณ์ หรือบริการเชื่อมต่อไม่ได้จะแสดงทางเลือกพิมพ์เอง
-- ข้อความจำกัด 400 ตัวอักษร ไม่มีการเริ่มเคสอัตโนมัติจากเสียง และหยุดฟังเมื่อออกจากหน้ารับ ECG
-- การถอดเสียงอาจใช้บริการภายนอกและต้องมีอินเทอร์เน็ต เช่น implementation ของ Chrome ตาม [MDN SpeechRecognition](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition) แอปไม่บันทึกไฟล์เสียง แต่บริการของ browser อาจรับเสียงไปประมวลผล ใช้เฉพาะข้อมูลสมมติในการสาธิต ห้ามถือว่าเป็นระบบถอดเสียงผู้ป่วยที่อนุมัติให้ใช้งานจริงแล้ว
-- Tests ตรวจ lifecycle ด้วยตัวจำลอง recognition ไม่ยืนยันความแม่นยำภาษาไทย คุณภาพไมค์ หรือการรองรับ browser/device ทุกเครื่อง
+- รายงานและไฟล์ต้นฉบับเก็บใน `output/reports/` เป็น JSON ในเครื่อง server ไม่ส่งขึ้น Git ข้อมูลไม่ได้เข้ารหัสและยังไม่มีระบบ retention ใช้เฉพาะข้อมูลสาธิต
+- PNG/JPEG ตรวจ MIME กับ magic bytes ไม่ใช่ full image decoder หรือการประเมินคุณภาพ ECG
+- WFDB รองรับคู่ `.hea` + `.dat` หนึ่งระเบียน 12 leads ตรวจ header/ชื่อไฟล์/lead labels และขนาด binary สำหรับ format 16 แบบตรงไปตรงมา รูปแบบอื่นตรวจ header เท่านั้น ไม่ถอดรหัสสัญญาณ ไม่รองรับ multi-segment หรือหลาย DAT ในระเบียนเดียว
+- ภาพและ WFDB ที่รับอัปโหลดได้ไม่ได้หมายความว่าโมเดลจริงรองรับ input นั้นแล้ว
+- ตัวอย่าง `examples/ecg-demo.hea` / `examples/ecg-demo.dat` เป็น waveform สังเคราะห์ 12 leads, 100 Hz, 10 วินาที ไม่ใช่ข้อมูลผู้ป่วย
 
-ส่งปรึกษาสำเร็จแล้วระบบพาไปหน้าติดตามผลทันที กลับเมนูเริ่มเคสจะมี **กลับไปเคสปัจจุบัน** และส่วนเริ่มเคสใหม่แยกต่างหาก ไม่บังคับล้างประวัติเมื่อต้องการกลับไปทำต่อ
+## Tech stack
 
-## ไฟล์ตัวอย่าง
+HTML, CSS responsive, JavaScript ES modules, Node.js built-in HTTP/filesystem/crypto และ Node Test Runner ไม่มี framework หรือ dependency เพิ่ม
 
-กดดาวน์โหลดตัวอย่างจากหน้ารับ ECG หรือใช้ [examples/synthetic-ecg.json](examples/synthetic-ecg.json) แล้วเลือกไฟล์นี้ในช่อง **เลือก JSON ตัวอย่าง**
+UI เก็บผลแต่ละ AI ไว้ใน `analyses[]` และแสดงแยกโมเดล เริ่มจากโมเดลจำลองหนึ่งตัว เมื่อนำ AI จริงมาใช้ให้เปลี่ยน inference function ฝั่ง server พร้อมยืนยัน input/preprocessing/output contract ไม่ฝัง API secret ใน browser
 
-JSON นี้กำหนดรหัสเคส อาการ และสถานการณ์จำลอง ไม่ใช่ไฟล์สัญญาณ ECG จริง ต้องมี `synthetic: true` และรหัสขึ้นต้น `DEMO-` ขนาดไม่เกิน 8 KB รองรับ scenario `stemi`, `nstemi`, `normal`, `unreadable` เท่านั้น ไม่รับ XML, WFDB, PDF หรือรูปถ่ายจริง อย่าใช้ข้อมูลผู้ป่วยจริงแม้จะตั้งรหัส DEMO
+## โครงสร้างและ API
 
-คลื่นทั้ง 12 leads สร้างจากฟังก์ชันคณิตศาสตร์เพื่อแสดง layout เท่านั้น ไม่สอดคล้องกับโรคแต่ละสถานการณ์ และไม่มีสเกลทางคลินิก
+```text
+src/app.js                 upload/history/report UI
+src/report-ui.js           report rendering, escaping และ URL
+src/report-service.js      ตรวจ input, mock inference, เก็บและอ่านรายงาน
+scripts/serve.mjs          localhost server และ report API
+examples/ecg-demo.*        คู่ไฟล์ WFDB สังเคราะห์
+output/reports/            รายงาน local (ไม่เข้า Git)
+```
 
-## เอกสารสำหรับประชุม
+- `GET /api/reports` — รายการประวัติ ไม่ส่ง base64 ของไฟล์ต้นฉบับ
+- `POST /api/reports` — รับ `{patientCode, notes, input: {kind: "image" | "wfdb", files: [{name, mime, base64}]}}` คืน report ที่บันทึกสำเร็จ HTTP 201
+- `GET /api/reports/<UUID>` — report พร้อมข้อมูลต้นฉบับ
+- `GET /reports/<UUID>` — หน้ารายงานอ่านอย่างเดียว
 
-- [Updated user journey: EMS → computer center → heart doctor](docs/user-journey.md) — doctor-informed current workflow and proposed AI-assisted journey; not yet implemented in the app
-- [Flowchart ของต้นแบบเดิม](docs/flowchart.md) — แยกไฟล์ Mermaid; GitHub render เป็นแผนภาพได้
-- [สคริปต์สาธิตและคำถามให้แพทย์รีวิว](docs/doctor-review.md)
-- [แผน implementation และขอบเขต](docs/implementation-plan.md)
-- [JSON contract สำหรับ inference API](docs/ai-api-contract.md) — request, accepted/success/failure response และจุดเชื่อมต่อโมเดลในอนาคต
-- [ผลตรวจ UX/UI และ flow ใน browser](docs/ux-review.md)
+Payload จำกัด 8 MiB และไฟล์ decoded รวม 5 MiB ถ้า AI ล้มเหลวจะบันทึกรายงานที่ไม่มีผล AI ไม่แปลงความล้มเหลวเป็น Normal ถ้าบันทึกลง disk ไม่สำเร็จ UI ไม่แสดงว่าสำเร็จและยังเก็บไฟล์ที่เลือกให้ลองใหม่ได้
 
-## Tech stack และฝั่ง AI
+## เอกสาร
 
-| ส่วน | เทคโนโลยี |
-| --- | --- |
-| หน้าเว็บ | HTML5, CSS responsive, JavaScript ES modules; ไม่มี frontend framework |
-| แสดงคลื่น | SVG สังเคราะห์ ไม่ใช้ chart library |
-| Local server | Node.js built-in HTTP/filesystem modules |
-| Tests | Node.js built-in test runner และ assertions |
-| API demo | JavaScript mock adapter สร้าง JSON ใน browser; ไม่มี HTTP inference call จริง |
-| เอกสาร | Markdown และ Mermaid สำหรับ GitHub |
+- [Flowchart ปัจจุบัน](docs/flowchart.md)
+- [Product scope](PRODUCT.md) / [UI direction](DESIGN.md)
+- [แผนปรับ Computer Center](docs/computer-center-plan.md)
+- [บริบท EMS / PEMPUS / แพทย์ที่คุยไว้](docs/user-journey.md)
+- [Inference JSON contract รุ่นก่อน](docs/ai-api-contract.md) — reference สำหรับ waveform adapter ไม่ใช่ report-upload API ปัจจุบัน
 
-ยังไม่มีโมเดลที่ train หรือ deploy ในโปรเจกต์นี้ โมเดลสุดท้ายอาจเป็น CNN และเรียกผ่าน API เมื่อทีม AI deploy แล้ว ฝั่งเว็บไม่ผูกกับ PyTorch/TensorFlow ดู contract ใน `docs/ai-api-contract.md` และ fixtures เต็มใน `examples/ai-analysis-*.json` เปิด **เครื่องมือผู้สาธิต / JSON API** แล้วกด **ดู JSON สำหรับ API** ในแผง AI เพื่อดู payload จำลองและดาวน์โหลด request เต็ม
-
-## ตรวจสอบโค้ด
+## ตรวจสอบ
 
 ```powershell
 npm test
 npm run check
 ```
 
-Tests ใช้ Node test runner ตรวจเงื่อนไข workflow เช่น การส่งก่อน AI เสร็จ การส่งค้างเมื่อ offline การผูกผลกับ ECG แต่ละชุด การซ่อนผลก่อนอ่านอิสระ และการตรวจ JSON ตัวอย่าง `check` ตรวจ syntax; ไม่มีการ build, typecheck หรือ lint framework เนื่องจากเป็น JavaScript มาตรฐาน ไม่มี dependency
+Tests ใช้ข้อมูลสังเคราะห์ ตรวจ input, WFDB, AI response, การเก็บประวัติ/เปิดใหม่, share route และข้อความรายงาน ไม่ยืนยัน clinical performance หรือความปลอดภัยในการใช้งานจริง
 
-## โครงสร้าง
+## GitHub
 
-```text
-index.html                 หน้าเริ่มต้น
-styles.css                 หน้าตาและ responsive layout
-src/app.js                 หน้าจอและ interaction
-src/model.js               สถานะของเคสและ ECG
-src/api.js                 mock inference JSON adapter และตรวจ response
-src/intake-tools.js        สร้างรหัสเคสและควบคุมการพูดเป็นข้อความ
-src/ecg.js                 SVG คลื่นสังเคราะห์
-scripts/serve.mjs          static server เฉพาะ localhost
-tests/model.test.js        workflow regression tests
-tests/api.test.js          API contract tests
-tests/intake-tools.test.js tests รหัสเคส/วงจรการถอดเสียง
-examples/                 fixture สังเคราะห์
-docs/                     flowchart และเอกสารรีวิว
-```
-
-## เตรียมขึ้น GitHub
-
-โฟลเดอร์นี้เป็น Git repository แยกจากข้อมูลวิจัยในโฟลเดอร์แม่ ให้สร้าง repository ว่างบน GitHub โดยยังไม่เพิ่ม README/license/gitignore จาก GitHub แล้วตั้ง remote และ push จากโฟลเดอร์นี้:
-
-```powershell
-git remote add origin https://github.com/YOUR_ACCOUNT/YOUR_REPOSITORY.git
-git push -u origin main
-```
-
-แทน `YOUR_ACCOUNT/YOUR_REPOSITORY` ด้วย repository ของคุณ โค้ดมีเฉพาะต้นแบบและข้อมูลสมมติ ไม่รวม dataset, proposal หรือเอกสารผู้ป่วยจากโฟลเดอร์แม่ ไม่มีการ publish หรือ deploy อัตโนมัติ
-
-## ขอบเขตที่ต้องทำเพิ่มก่อนใช้จริง
-
-ต้นแบบยังไม่มี authentication, การรับข้อมูลจากเครื่อง, clinical signal-quality checks, inference, การแจ้งเตือน, server persistence หรือการเชื่อมระบบโรงพยาบาล ไม่ activate fast track ไม่เลือกโรงพยาบาลปลายทาง และไม่ออกคำสั่งรักษา การเพิ่มส่วนเหล่านี้ต้องยืนยันกับทีมแพทย์และฝั่ง AI หลังรีวิว journey
+Remote: https://github.com/Bearior/EKG-user-journey เก็บเฉพาะโค้ด เอกสาร และ fixture สังเคราะห์ ไม่รวม dataset หรือรายงาน local
