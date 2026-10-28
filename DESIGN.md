@@ -1,4 +1,4 @@
-# Computer Center workspace
+# EMS Center workspace
 
 Direction: clean operating workspace, with a separate readable examination report. Based on the user's explicit request to simplify the earlier multi-role prototype.
 

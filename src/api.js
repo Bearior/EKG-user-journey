@@ -26,7 +26,12 @@ export function mockCompletedResponse(request, scenario) {
   if (scenario === 'unreadable') return { ...base, status: 'failed', result: null, error: { code: 'ANALYSIS_UNAVAILABLE', message: 'การวิเคราะห์จำลองไม่สามารถให้ผลได้', retryable: true } };
   if (!Object.hasOwn(classNames, scenario)) throw new Error('Unknown mock scenario');
   const scores = Object.fromEntries(Object.values(classNames).map(name => [name, name === classNames[scenario] ? 0.8 : 0.1]));
-  return { ...base, status: 'succeeded', result: { predicted_class: classNames[scenario], class_scores: scores, scores_calibrated: false, requires_clinician_review: true }, error: null };
+  return { ...base, status: 'succeeded', result: { predicted_class: classNames[scenario], class_scores: scores, scores_calibrated: false, requires_clinician_review: true }, explanation: {
+    is_mock: true, method: 'Demo lead attribution',
+    summary: 'ตัวอย่างการแสดง lead และช่วงเวลาที่โมเดลให้ความสำคัญ ไม่ได้คำนวณจาก ECG ที่อัปโหลด และไม่ใช่หลักฐานทางคลินิก',
+    lead_importance: leadOrder.map((lead, index) => ({ lead, score: [0.12, 0.18, 0.09, 0.08, 0.2, 0.13, 0.42, 0.88, 0.94, 0.76, 0.38, 0.22][index] })),
+    regions: [{ lead: 'V2', start_seconds: 2, end_seconds: 2.4 }, { lead: 'V3', start_seconds: 2, end_seconds: 2.4 }, { lead: 'V4', start_seconds: 5.2, end_seconds: 5.6 }]
+  }, error: null };
 }
 export function validateCompletedResponse(request, response) {
   if (!response || response.schema_version !== '1.0') throw new Error('Unsupported response schema version');

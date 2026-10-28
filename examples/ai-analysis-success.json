@@ -25,5 +25,77 @@
     "scores_calibrated": false,
     "requires_clinician_review": true
   },
+  "explanation": {
+    "is_mock": true,
+    "method": "Demo lead attribution",
+    "summary": "ตัวอย่างการแสดง lead และช่วงเวลาที่โมเดลให้ความสำคัญ ไม่ได้คำนวณจาก ECG ที่อัปโหลด และไม่ใช่หลักฐานทางคลินิก",
+    "lead_importance": [
+      {
+        "lead": "I",
+        "score": 0.12
+      },
+      {
+        "lead": "II",
+        "score": 0.18
+      },
+      {
+        "lead": "III",
+        "score": 0.09
+      },
+      {
+        "lead": "aVR",
+        "score": 0.08
+      },
+      {
+        "lead": "aVL",
+        "score": 0.2
+      },
+      {
+        "lead": "aVF",
+        "score": 0.13
+      },
+      {
+        "lead": "V1",
+        "score": 0.42
+      },
+      {
+        "lead": "V2",
+        "score": 0.88
+      },
+      {
+        "lead": "V3",
+        "score": 0.94
+      },
+      {
+        "lead": "V4",
+        "score": 0.76
+      },
+      {
+        "lead": "V5",
+        "score": 0.38
+      },
+      {
+        "lead": "V6",
+        "score": 0.22
+      }
+    ],
+    "regions": [
+      {
+        "lead": "V2",
+        "start_seconds": 2,
+        "end_seconds": 2.4
+      },
+      {
+        "lead": "V3",
+        "start_seconds": 2,
+        "end_seconds": 2.4
+      },
+      {
+        "lead": "V4",
+        "start_seconds": 5.2,
+        "end_seconds": 5.6
+      }
+    ]
+  },
   "error": null
 }

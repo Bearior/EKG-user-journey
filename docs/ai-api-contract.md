@@ -172,3 +172,8 @@
 - [Failed response](../examples/ai-analysis-failure.json)
 - สร้าง fixtures ซ้ำด้วย `node scripts/generate-api-examples.mjs`
 - `npm test` ตรวจ shape ของ request, ID binding, response status/class และกรณี failed ไม่มีผล Normal
+
+
+## Report UI update (28 October 2026)
+
+EMS Center reports now display class_scores as confidence percentages, explicitly labelled as mock and uncalibrated rather than clinical risk. Successful mock responses also include optional `explanation` with `is_mock`, `method`, `summary`, `lead_importance: [{lead, score}]`, and `regions: [{lead, start_seconds, end_seconds}]`. These describe a synthetic XAI presentation, not findings on the uploaded ECG. The report preserves model-specific explanations separately; missing explanations remain unavailable.

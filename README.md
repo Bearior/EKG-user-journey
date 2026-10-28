@@ -1,8 +1,8 @@
-# ECG Bridge — Computer Center
+# ECG Bridge — EMS Center
 
-เว็บสำหรับเจ้าหน้าที่ Computer Center: **อัปโหลด ECG → AI จำลองประเมิน → เปิดรายงานและบันทึกประวัติอัตโนมัติ → Copy Link ส่งต่อใน LINE**
+เว็บสำหรับเจ้าหน้าที่ EMS Center: **อัปโหลด ECG → AI จำลองประเมิน → เปิดรายงานและบันทึกประวัติอัตโนมัติ → Copy Link ส่งต่อใน LINE**
 
-> เวอร์ชันสาธิต ใช้ข้อมูลสมมติเท่านั้น ผล AI เป็นผลตัวอย่าง ไม่ได้วิเคราะห์ไฟล์ด้วยโมเดลจริง ไม่มีการส่งข้อความ LINE หรือเชื่อม PEMPUS อัตโนมัติ
+> เวอร์ชันสาธิต ใช้ข้อมูลสมมติเท่านั้น ผล AI เป็นผลตัวอย่าง ไม่ได้วิเคราะห์ไฟล์ด้วยโมเดลจริง ไม่มีการส่งข้อความ LINE หรือเชื่อม Tempus อัตโนมัติ
 
 ## เปิดเว็บ
 
@@ -41,6 +41,14 @@ npm start
 
 Copy Link เป็นการคัดลอกเท่านั้น ไม่ยืนยันว่าได้ส่ง LINE หรือแพทย์ได้อ่านแล้ว
 
+## Confidence และ Explainable AI
+
+รายงานแสดง confidence ของคลาสที่ AI ทำนาย พร้อมคะแนน STEMI / NSTEMI / Normal เป็นเปอร์เซ็นต์ คะแนนเป็นค่าจำลองและยังไม่ calibrated ไม่ใช่ความเสี่ยงเกิดโรค
+
+Section **Explainable AI (XAI)** แยกจากผลทำนาย แสดง lead-attribution 12 leads และช่วงเวลาตัวอย่างสำหรับรายงานใหม่ ข้อมูลทั้งหมดจำลอง ไม่ใช่ Grad-CAM/saliency ที่คำนวณจากไฟล์อัปโหลด รายงานเก่าที่ไม่มี XAI แสดงว่าไม่มีข้อมูล ไม่สร้างคำอธิบายย้อนหลัง
+
+ชื่อสถานที่ใช้ **EMS Center** และเครื่องบนรถใช้ **Tempus** ตามข้อมูลล่าสุดของผู้ใช้ ยังไม่ยืนยันรุ่นเครื่องหรือ API
+
 ## การจัดเก็บและรูปแบบไฟล์
 
 - รายงานและไฟล์ต้นฉบับเก็บใน `output/reports/` เป็น JSON ในเครื่อง server ไม่ส่งขึ้น Git ข้อมูลไม่ได้เข้ารหัสและยังไม่มีระบบ retention ใช้เฉพาะข้อมูลสาธิต
@@ -77,8 +85,8 @@ Payload จำกัด 8 MiB และไฟล์ decoded รวม 5 MiB ถ�
 
 - [Flowchart ปัจจุบัน](docs/flowchart.md)
 - [Product scope](PRODUCT.md) / [UI direction](DESIGN.md)
-- [แผนปรับ Computer Center](docs/computer-center-plan.md)
-- [บริบท EMS / PEMPUS / แพทย์ที่คุยไว้](docs/user-journey.md)
+- [แผนปรับ EMS Center](docs/computer-center-plan.md)
+- [บริบท EMS / Tempus / แพทย์ที่คุยไว้](docs/user-journey.md)
 - [Inference JSON contract รุ่นก่อน](docs/ai-api-contract.md) — reference สำหรับ waveform adapter ไม่ใช่ report-upload API ปัจจุบัน
 
 ## ตรวจสอบ

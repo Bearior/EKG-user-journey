@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Computer Center ECG upload, saved AI demo reports and read-only report links",
+  "description": "EMS Center ECG upload, saved AI demo reports and read-only report links",
   "scripts": {
     "start": "node scripts/serve.mjs",
     "test": "node --test --test-isolation=none",
