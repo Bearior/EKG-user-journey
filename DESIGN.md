@@ -3,7 +3,7 @@
 Direction: clean operating workspace, with a separate readable examination report. Based on the user's explicit request to simplify the earlier multi-role prototype.
 
 - White surface #FFFFFF, page #F4F7F9, ink #18334B, secondary #526779, teal action #087E83, line #DCE5EC; warm status colors reserved for failure/pending, not decoration.
-- Local Thai text fonts Leelawadee UI / Tahoma; system sans fallback. Body 14–16px, readable field labels, strong report title; left aligned.
+- Local Thai text font Tahoma first, Noto Sans Thai / Leelawadee UI / system fallback; no external font requests. Base and body 16px, controls 15px, supporting text at least 12px, generous 1.65–1.8 line height, zero negative heading tracking; left aligned.
 - Slim horizontal app header. Two destinations: upload and history. No numbered role journey, sidebar, physician form, network toggle or scenario picker in the main flow.
 - Upload is the primary action; image and WFDB are two clearly labelled input options. Show selected source before submission. Patient/job code and notes are optional.
 - Desktop: upload form with quiet recent-history rail. Mobile: one column, no page overflow.
