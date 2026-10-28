@@ -1,5 +1,7 @@
 # Flowchart: ECG AI Triage Prototype
 
+> This chart documents the earlier implemented prototype. For the updated doctor-informed EMS → PEMPUS/computer center → LINE/heart doctor journey, use [user-journey.md](user-journey.md). The app has not yet been redesigned around that updated journey.
+
 เอกสารนี้อธิบาย user journey สำหรับต้นแบบ 3 ขั้นตอนทีมหน้างานและมุมมองแพทย์แยกบทบาท เพื่อให้ทีมและแพทย์เห็นการไหลของข้อมูลตั้งแต่รับ ECG จนได้รับความเห็นจากแพทย์
 
 ## ขอบเขตของต้นแบบ

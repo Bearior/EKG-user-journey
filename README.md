@@ -69,7 +69,8 @@ JSON นี้กำหนดรหัสเคส อาการ และส�
 
 ## เอกสารสำหรับประชุม
 
-- [Flowchart และบทบาทผู้ใช้](docs/flowchart.md) — แยกไฟล์ Mermaid; GitHub render เป็นแผนภาพได้
+- [Updated user journey: EMS → computer center → heart doctor](docs/user-journey.md) — doctor-informed current workflow and proposed AI-assisted journey; not yet implemented in the app
+- [Flowchart ของต้นแบบเดิม](docs/flowchart.md) — แยกไฟล์ Mermaid; GitHub render เป็นแผนภาพได้
 - [สคริปต์สาธิตและคำถามให้แพทย์รีวิว](docs/doctor-review.md)
 - [แผน implementation และขอบเขต](docs/implementation-plan.md)
 - [JSON contract สำหรับ inference API](docs/ai-api-contract.md) — request, accepted/success/failure response และจุดเชื่อมต่อโมเดลในอนาคต
