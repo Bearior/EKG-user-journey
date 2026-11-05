@@ -9,6 +9,7 @@ Direction: clean operating workspace, with a separate readable examination repor
 - During submission, show a dedicated loading screen with an indeterminate spinner, source filenames, and preparation / AI request / report steps. Advance only from actual client events; no invented completion percentage. Default mock inference waits 2 seconds so the demo is visible; injected inference has no artificial delay. Respect reduced motion and preserve files on failure.
 - Desktop: upload form with quiet recent-history rail. Mobile: one column, no page overflow.
 - Report: clear mock label, source/reference/time, structured AI model results, source preview, and Copy Link/Print actions. Avoid uncalibrated percentages.
+- AI result hierarchy: group the predicted class and its explicitly labelled model confidence together, followed by full-width comparison bars for all three classes. Mark the predicted row with text as well as color. Keep mock/calibration limitations readable; use a stacked summary on mobile. Model scores are not disease probabilities.
 - History is a compact searchable list of saved reports, not a wall of status cards. Empty, loading, failure and retry states must work.
 - Shared route hides upload/navigation/history controls. No edit or doctor-reply controls on a report link.
 - Preserve native keyboard and file-input behavior; visible focus; report printable without app chrome.

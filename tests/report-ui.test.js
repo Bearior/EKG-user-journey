@@ -43,6 +43,20 @@ test('missing scores or explanations are shown as unavailable rather than invent
   assert.ok(!html.includes('80%'));
   assert.ok(html.includes('ยังไม่มีข้อมูล XAI'));
 });
+
+test('prediction summary binds confidence to its class and highlights only that score row', () => {
+  for (const predicted of ['STEMI', 'NSTEMI', 'NORMAL']) {
+    const analysis = { ...report.analyses[0], result: { ...report.analyses[0].result, predicted_class: predicted, class_scores: Object.fromEntries(['STEMI', 'NSTEMI', 'NORMAL'].map(label => [label, label === predicted ? .8 : .1])) } };
+    const html = reportMarkup({ ...report, analyses: [analysis] });
+    const label = predicted === 'NORMAL' ? 'Normal' : predicted;
+    assert.ok(html.includes(`คะแนนสำหรับ ${label}</span><strong>80%</strong>`));
+    assert.ok(html.includes('เปรียบเทียบคะแนนทั้ง 3 กลุ่ม'));
+    assert.equal((html.match(/class="score-row is-predicted"/g) || []).length, 1);
+    assert.ok(html.includes(`class="score-label">${label}<small>ผลที่ AI เลือก</small>`));
+    assert.ok(html.includes('Model confidence · จำลอง'));
+    assert.ok(html.includes('ไม่ใช่โอกาสเกิดโรค'));
+  }
+});
 test('new mock report renders separate XAI lead attribution and time regions with honest labels', () => {
   const analysis = mockCompletedResponse({ request_id: 'REQ-1', case_id: 'DEMO-1', ecg_id: 'ECG-1' }, 'stemi');
   const html = reportMarkup({ ...report, analyses: [analysis] });
