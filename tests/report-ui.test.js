@@ -65,3 +65,15 @@ test('shared report URL contains opaque report ID and no patient details', () =>
   assert.equal(reportUrl(report.id, 'http://localhost:4173'), 'http://localhost:4173/reports/afe33357-1a39-4de2-a167-f58f6eca9c3c');
   assert.throws(() => reportUrl('../secret', 'http://localhost:4173'));
 });
+
+test('demo XAI includes supplied reference images with honest labels and full-size links', () => {
+  const html = reportMarkup(report);
+  assert.ok(html.includes('ไม่ได้สร้างจาก ECG ของรายงานนี้'));
+  assert.ok(html.includes('ไม่เกี่ยวข้องกับคะแนนจำลองด้านบน'));
+  assert.match(html, /<img src="\/assets\/xai\/lead-attribution-example.png"/);
+  assert.match(html, /<img class="xai-neurokit" src="\/assets\/xai\/neurokit-interval-example.png"/);
+  assert.equal((html.match(/เปิดภาพตัวอย่างขนาดเต็ม/g) || []).length, 2);
+  const real = { ...report.analyses[0], model: { ...report.analyses[0].model, is_mock: false } };
+  assert.ok(!reportMarkup({ ...report, analyses: [real] }).includes('/assets/xai/'));
+  assert.ok(!reportMarkup({ ...report, analyses: [{ ...report.analyses[0], status: 'failed', result: null }] }).includes('/assets/xai/'));
+});

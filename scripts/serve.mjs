@@ -5,8 +5,8 @@ import { resolve, extname } from 'node:path';
 import { createReportService, ValidationError } from '../src/report-service.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const allowed = new Set(['/index.html', '/styles.css', '/src/app.js', '/src/report-ui.js', '/src/model.js', '/src/api.js', '/src/ecg.js', '/src/intake-tools.js', '/examples/synthetic-ecg.json', '/examples/ecg-demo.hea', '/examples/ecg-demo.dat']);
-const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.hea': 'text/plain; charset=utf-8', '.dat': 'application/octet-stream' };
+const allowed = new Set(['/index.html', '/styles.css', '/src/app.js', '/src/report-ui.js', '/src/model.js', '/src/api.js', '/src/ecg.js', '/src/intake-tools.js', '/examples/synthetic-ecg.json', '/examples/ecg-demo.hea', '/examples/ecg-demo.dat', '/assets/xai/lead-attribution-example.png', '/assets/xai/neurokit-interval-example.png']);
+const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.hea': 'text/plain; charset=utf-8', '.dat': 'application/octet-stream', '.png': 'image/png' };
 const maxBodyBytes = 8 * 1024 * 1024;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

@@ -11,4 +11,5 @@ Direction: clean operating workspace, with a separate readable examination repor
 - Report: clear mock label, source/reference/time, structured AI model results, source preview, and Copy Link/Print actions. Avoid uncalibrated percentages.
 - History is a compact searchable list of saved reports, not a wall of status cards. Empty, loading, failure and retry states must work.
 - Shared route hides upload/navigation/history controls. No edit or doctor-reply controls on a report link.
+- Successful demo reports show the two user-supplied XAI reference images: lead attribution/time intervals and NeuroKit2 highlights. Label them as static examples unrelated to the uploaded ECG or mock scores; preserve aspect ratios and offer full-size links. Hide these examples for failed or real-model reports.
 - Preserve native keyboard and file-input behavior; visible focus; report printable without app chrome.
