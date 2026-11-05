@@ -1,4 +1,4 @@
-import { escape, timeLabel, sizeLabel, reportMarkup, reportUrl } from './report-ui.js';
+import { escape, timeLabel, sizeLabel, reportMarkup, reportUrl, processingMarkup } from './report-ui.js';
 
 const app = document.querySelector('#app');
 const paths = {
@@ -17,6 +17,7 @@ let view = sharedId ? 'report' : 'upload';
 let report = null, history = [], files = [];
 let historyLoaded = false, historyError = '', kind = 'image', patientCode = '', notes = '', search = '', error = '', notice = '';
 let processing = false, loading = Boolean(sharedId), copyFallback = false, reportSequence = 0;
+let processingPhase = 'preparing';
 
 async function api(path, options) {
   const response = await fetch(path, options);
@@ -36,7 +37,7 @@ function historyRows(items, compact = false) {
 }
 
 function uploadView() {
-  if (processing) return `<section class="processing-panel" role="status"><div class="processing-icon">${icon('pulse')}</div><h1>กำลังจัดทำรายงาน ECG</h1><p>รับไฟล์แล้ว กำลังเรียก AI จำลองและบันทึกผล</p><div class="processing-files">${files.map(file => `<span>${icon('file')}${escape(file.name)}</span>`).join('')}</div><p class="muted">กรุณารอสักครู่ รายงานจะเปิดให้อัตโนมัติเมื่อบันทึกสำเร็จ</p></section>`;
+  if (processing) return processingMarkup(files, processingPhase);
   return `<div class="page-title"><div><h1>ตรวจ ECG</h1><p>อัปโหลดไฟล์ แล้วรับรายงานที่พร้อมส่งต่อให้แพทย์</p></div></div><div class="upload-layout"><section class="upload-panel"><form id="upload-form"><h2>อัปโหลด ECG</h2><div class="input-kind" role="group" aria-label="ประเภทไฟล์"><button type="button" data-kind="image" class="kind-option ${kind === 'image' ? 'selected' : ''}" aria-pressed="${kind === 'image'}">${icon('image')}<span>รูปภาพ ECG<small>PNG / JPEG</small></span></button><button type="button" data-kind="wfdb" class="kind-option ${kind === 'wfdb' ? 'selected' : ''}" aria-pressed="${kind === 'wfdb'}">${icon('pulse')}<span>ข้อมูล WFDB<small>.hea + .dat</small></span></button></div><label class="drop-zone ${files.length ? 'has-files' : ''}" id="drop-zone">${icon('upload')}<strong>${files.length ? 'เลือกไฟล์ใหม่' : kind === 'wfdb' ? 'เลือกไฟล์ .hea และ .dat พร้อมกัน' : 'เลือกหรือลากรูป ECG มาวางที่นี่'}</strong><span>${kind === 'wfdb' ? 'ต้องเป็นคู่ไฟล์จาก ECG ระเบียนเดียวกัน' : 'รองรับ PNG และ JPEG'} · รวมไม่เกิน 5 MB</span><input class="sr-only" id="ecg-files" type="file" ${kind === 'wfdb' ? 'multiple accept=".hea,.dat"' : 'accept="image/png,image/jpeg"'} aria-label="${kind === 'wfdb' ? 'เลือกไฟล์ WFDB .hea และ .dat' : 'เลือกภาพ ECG PNG หรือ JPEG'}"></label>${files.length ? `<div class="selected-files">${files.map(file => `<div>${icon('file')}<span>${escape(file.name)}<small>${sizeLabel(file.size)}</small></span></div>`).join('')}<button type="button" class="text-button" data-action="clear-files">นำไฟล์ออก</button></div>` : ''}<div class="sample-row"><button type="button" class="text-button" data-action="sample">ลองด้วย WFDB ตัวอย่าง</button><span>ข้อมูลสังเคราะห์</span></div><div class="form-details"><label class="field" for="patient-code">รหัสอ้างอิงผู้ป่วย / งาน <span>ไม่บังคับ</span></label><input id="patient-code" maxlength="40" value="${escape(patientCode)}" placeholder="เช่น EMS-001 · ไม่ใส่ชื่อผู้ป่วยจริง"><label class="field" for="notes">บันทึกประกอบ <span>ไม่บังคับ</span></label><textarea id="notes" maxlength="400" rows="3" placeholder="บริบทสั้น ๆ ที่ต้องการแนบให้แพทย์">${escape(notes)}</textarea></div><div class="submit-area"><button class="button primary" type="submit" ${!files.length ? 'disabled' : ''}>${icon('pulse')}ประมวลผลและเปิดรายงาน</button><p>บันทึกเข้าประวัติอัตโนมัติ ไม่ต้องกดบันทึกซ้ำ</p></div></form></section><aside class="recent-panel"><div class="section-heading"><h2>ตรวจล่าสุด</h2><button class="text-button" data-action="history">ดูทั้งหมด</button></div>${historyError ? `<p class="inline-error">${escape(historyError)}</p><button class="text-button" data-action="reload-history">ลองโหลดประวัติอีกครั้ง</button>` : !historyLoaded ? '<p class="loading-note">กำลังโหลดประวัติ…</p>' : historyRows(history.slice(0, 5), true)}<div class="workflow-note"><h3>รายงานพร้อมส่งต่อ</h3><p>หลังตรวจเสร็จ เปิดรายงานแล้วกด Copy Link เพื่อนำไปส่งใน LINE ได้</p></div></aside></div>`;
 }
 
@@ -92,9 +93,11 @@ function encodeFile(file) {
 }
 async function submit() {
   if (processing || !files.length) return;
-  processing = true; error = ''; notice = ''; render();
+  processing = true; processingPhase = 'preparing'; error = ''; notice = ''; render();
+  document.querySelector('#main').focus(); window.scrollTo(0, 0);
   try {
     const encoded = await Promise.all(files.map(encodeFile));
+    processingPhase = 'predicting'; render();
     const saved = await api('/api/reports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientCode, notes, input: { kind, files: encoded } }) });
     reportSequence++; report = saved; view = 'report'; files = []; patientCode = ''; notes = ''; copyFallback = false;
     notice = 'รายงานพร้อมแล้ว และบันทึกเข้าประวัติเรียบร้อย'; void loadHistory();

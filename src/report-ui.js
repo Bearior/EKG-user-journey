@@ -1,6 +1,16 @@
 export const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const timeLabel = value => new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 export const sizeLabel = value => value >= 1048576 ? `${(value / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(value / 1024))} KB`;
+export function processingMarkup(files, phase) {
+  const predicting = phase === 'predicting';
+  return `<section class="processing-panel" aria-labelledby="processing-title">
+    <div class="processing-spinner" aria-hidden="true"></div>
+    <div role="status" aria-live="polite" aria-atomic="true"><h1 id="processing-title">${predicting ? 'กำลังประเมิน ECG ด้วย AI' : 'กำลังเตรียมไฟล์ ECG'}</h1><p>${predicting ? 'กำลังส่งข้อมูลและรอผลจาก AI จำลอง' : 'กำลังอ่านไฟล์ที่เลือก กรุณารอสักครู่'}</p></div>
+    <ol class="processing-steps"><li class="${predicting ? 'complete' : 'current'}" ${predicting ? '' : 'aria-current="step"'}><span class="step-dot" aria-hidden="true"></span>เตรียมไฟล์ ECG${predicting ? '<small>เรียบร้อย</small>' : '<small>กำลังดำเนินการ</small>'}</li><li class="${predicting ? 'current' : ''}" ${predicting ? 'aria-current="step"' : ''}><span class="step-dot" aria-hidden="true"></span>ส่งข้อมูลและประเมินด้วย AI<small>${predicting ? 'กำลังดำเนินการ' : 'รอดำเนินการ'}</small></li><li><span class="step-dot" aria-hidden="true"></span>บันทึกและเปิดรายงาน<small>เมื่อได้รับผลตอบกลับ</small></li></ol>
+    <div class="processing-files">${files.map(file => `<span>${escape(file.name)}</span>`).join('')}</div>
+    <p class="muted">รายงานจะเปิดอัตโนมัติ ไม่ต้องกดส่งซ้ำหรือรีเฟรชหน้า</p><p class="processing-demo-note">โหมดสาธิต · จำลองเวลารอ AI ประมาณ 2 วินาที<br>ยังไม่มีการวิเคราะห์ ECG ด้วยโมเดลจริง</p>
+  </section>`;
+}
 export function reportUrl(id, origin) {
   if (!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)) throw new Error('รหัสรายงานไม่ถูกต้อง');
   return new URL(`/reports/${id}`, origin).href;

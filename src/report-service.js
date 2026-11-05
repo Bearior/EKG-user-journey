@@ -145,6 +145,8 @@ export function createReportService({ storageDir, infer, idFactory = randomUUID 
     const request = requestFor(id, validated.patientCode);
     let analyses; let status = 'completed';
     try {
+      // Keep the demo loading state visible; real inference uses its own response time.
+      if (!infer) await new Promise(resolve => setTimeout(resolve, 2000));
       const response = infer ? await infer({ id, request, input: validated.input }) : [mockCompletedResponse(request, 'stemi')];
       try { analyses = normalizeAnalyses(response, request); }
       catch { status = 'failed'; analyses = [failedAnalysis(request, 'INVALID_AI_RESPONSE', 'AI response did not meet the required completed-result format.')]; }

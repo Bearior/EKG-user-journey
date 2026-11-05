@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reportMarkup, reportUrl } from '../src/report-ui.js';
+import { reportMarkup, reportUrl, processingMarkup } from '../src/report-ui.js';
 import { mockCompletedResponse } from '../src/api.js';
 
 const report = {
@@ -9,6 +9,22 @@ const report = {
   input: { kind: 'wfdb', name: 'demo.hea + demo.dat', size: 24000 },
   analyses: [{ status: 'succeeded', model: { name: 'ECG demo', version: 'mock-0.1', is_mock: true }, result: { predicted_class: 'STEMI', class_scores: { STEMI: .8, NSTEMI: .1, NORMAL: .1 }, scores_calibrated: false }, error: null }]
 };
+
+test('processing screen shows actual request phases, demo notice and escaped file names', () => {
+  const files = [{ name: '<img src=x onerror=alert(1)>.png' }];
+  const preparing = processingMarkup(files, 'preparing');
+  const predicting = processingMarkup(files, 'predicting');
+  assert.ok(preparing.includes('กำลังเตรียมไฟล์ ECG'));
+  assert.ok(predicting.includes('กำลังประเมิน ECG ด้วย AI'));
+  assert.match(predicting, /class="complete"/);
+  assert.match(predicting, /class="current" aria-current="step"/);
+  assert.ok(predicting.includes('role="status"'));
+  assert.ok(predicting.includes('จำลองเวลารอ AI ประมาณ 2 วินาที'));
+  assert.ok(predicting.includes('ยังไม่มีการวิเคราะห์ ECG ด้วยโมเดลจริง'));
+  assert.ok(predicting.includes('&lt;img'));
+  assert.ok(!predicting.includes('<img'));
+  assert.ok(!predicting.includes('%'));
+});
 
 test('report escapes content and labels confidence as uncalibrated model score', () => {
   const html = reportMarkup(report);

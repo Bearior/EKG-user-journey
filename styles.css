@@ -103,9 +103,18 @@ textarea { resize: vertical; min-height: 85px; line-height: 1.7; }
 .inline-error { color: #873d31; }
 .processing-panel, .loading-panel { text-align: center; max-width: 650px; margin: 70px auto; padding: 50px 25px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
 .processing-panel h1 { font-size: 27px; }
-.processing-panel > p, .loading-panel > p { color: var(--muted); margin-top: 12px; }
-.processing-icon { color: var(--teal); background: #eaf5f4; display: grid; place-items: center; width: 65px; height: 65px; border-radius: 50%; margin: 0 auto 25px; }
-.processing-icon svg { width: 35px; height: 35px; }
+.processing-panel > p, .processing-panel [role=status] > p, .loading-panel > p { color: var(--muted); margin-top: 12px; }
+.processing-spinner { width: 48px; height: 48px; border: 4px solid #dcebea; border-top-color: var(--teal); border-radius: 50%; margin: 0 auto 25px; animation: processing-spin 1s linear infinite; }
+@keyframes processing-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .processing-spinner { animation: none; } }
+.processing-steps { list-style: none; padding: 0; margin: 30px auto; max-width: 390px; text-align: left; }
+.processing-steps li { display: grid; grid-template-columns: 18px minmax(0,1fr); column-gap: 12px; padding: 12px 0; color: var(--muted); }
+.processing-steps small { grid-column: 2; font-size: 13px; font-weight: 400; }
+.step-dot { width: 12px; height: 12px; border: 1px solid #79909d; border-radius: 50%; margin-top: 7px; }
+.processing-steps .current { color: var(--teal); font-weight: 600; }
+.current .step-dot { border: 3px solid var(--teal); }
+.complete .step-dot { border-color: var(--teal); background: var(--teal); }
+.processing-panel .processing-demo-note { font-size: 13px; padding-top: 18px; border-top: 1px solid var(--line); }
 .processing-files { display: flex; flex-direction: column; gap: 10px; align-items: center; margin: 25px 0; }
 .processing-files span { display: flex; gap: 8px; align-items: center; font-size: 14px; overflow-wrap: anywhere; }
 .muted { color: var(--muted); font-size: 14px; }

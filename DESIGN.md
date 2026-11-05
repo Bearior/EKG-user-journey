@@ -6,6 +6,7 @@ Direction: clean operating workspace, with a separate readable examination repor
 - Local Thai text font Tahoma first, Noto Sans Thai / Leelawadee UI / system fallback; no external font requests. Base and body 16px, controls 15px, supporting text at least 12px, generous 1.65–1.8 line height, zero negative heading tracking; left aligned.
 - Slim horizontal app header. Two destinations: upload and history. No numbered role journey, sidebar, physician form, network toggle or scenario picker in the main flow.
 - Upload is the primary action; image and WFDB are two clearly labelled input options. Show selected source before submission. Patient/job code and notes are optional.
+- During submission, show a dedicated loading screen with an indeterminate spinner, source filenames, and preparation / AI request / report steps. Advance only from actual client events; no invented completion percentage. Default mock inference waits 2 seconds so the demo is visible; injected inference has no artificial delay. Respect reduced motion and preserve files on failure.
 - Desktop: upload form with quiet recent-history rail. Mobile: one column, no page overflow.
 - Report: clear mock label, source/reference/time, structured AI model results, source preview, and Copy Link/Print actions. Avoid uncalibrated percentages.
 - History is a compact searchable list of saved reports, not a wall of status cards. Empty, loading, failure and retry states must work.
