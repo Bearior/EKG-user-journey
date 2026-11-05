@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { reportMarkup, reportUrl, processingMarkup } from '../src/report-ui.js';
+import { xaiWaveformSvg } from '../src/ecg.js';
 import { mockCompletedResponse } from '../src/api.js';
 
 const report = {
@@ -66,14 +67,30 @@ test('shared report URL contains opaque report ID and no patient details', () =>
   assert.throws(() => reportUrl('../secret', 'http://localhost:4173'));
 });
 
-test('demo XAI includes supplied reference images with honest labels and full-size links', () => {
-  const html = reportMarkup(report);
-  assert.ok(html.includes('ไม่ได้สร้างจาก ECG ของรายงานนี้'));
-  assert.ok(html.includes('ไม่เกี่ยวข้องกับคะแนนจำลองด้านบน'));
-  assert.match(html, /<img src="\/assets\/xai\/lead-attribution-example.png"/);
-  assert.match(html, /<img class="xai-neurokit" src="\/assets\/xai\/neurokit-interval-example.png"/);
-  assert.equal((html.match(/เปิดภาพตัวอย่างขนาดเต็ม/g) || []).length, 2);
-  const real = { ...report.analyses[0], model: { ...report.analyses[0].model, is_mock: false } };
-  assert.ok(!reportMarkup({ ...report, analyses: [real] }).includes('/assets/xai/'));
-  assert.ok(!reportMarkup({ ...report, analyses: [{ ...report.analyses[0], status: 'failed', result: null }] }).includes('/assets/xai/'));
+test('mock XAI renders native traces, ranked attribution and expandable highlighted intervals', () => {
+  const analysis = mockCompletedResponse({ request_id: 'REQ-1', case_id: 'DEMO-1', ecg_id: 'ECG-1' }, 'stemi');
+  const html = reportMarkup({ ...report, analyses: [analysis] });
+  assert.ok(!html.includes('<img'));
+  assert.ok(!html.includes('/assets/xai/'));
+  assert.ok(html.includes('Attribution by lead'));
+  assert.ok(html.includes('0.94'));
+  assert.equal((html.match(/class="xai-trace"/g) || []).length, 15);
+  assert.equal((html.match(/class="xai-highlight"/g) || []).length, 6);
+  assert.equal((html.match(/<details class="xai-interval"/g) || []).length, 3);
+  assert.ok(html.includes('Mock XAI'));
+  const real = { ...analysis, model: { ...analysis.model, is_mock: false }, explanation: { ...analysis.explanation, is_mock: false } };
+  assert.ok(!reportMarkup({ ...report, analyses: [real] }).includes('class="xai-trace"'));
+  assert.ok(!reportMarkup({ ...report, analyses: [{ ...analysis, status: 'failed', result: null }] }).includes('class="xai-trace"'));
+});
+
+test('mock waveform bounds and labels are safe and deterministic', () => {
+  const regions = [{ lead: 'V3', start_seconds: 2, end_seconds: 2.4 }];
+  const html = xaiWaveformSvg(['V3', '<script>'], regions, 1.5, 2.9);
+  assert.equal(html, xaiWaveformSvg(['V3'], regions, 1.5, 2.9));
+  assert.ok(!html.includes('NaN'));
+  assert.ok(!html.includes('<script>'));
+  assert.ok(html.includes('class="xai-highlight"'));
+  assert.equal(xaiWaveformSvg(['V3'], regions, 11, 12), '');
+  assert.equal(xaiWaveformSvg(['V3'], regions, NaN, 2), '');
+  assert.equal(xaiWaveformSvg(['unknown'], regions), '');
 });
